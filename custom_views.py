@@ -1,5 +1,4 @@
 from django.http import HttpResponse
-from django.utils import timezone
 from rest_framework.renderers import JSONRenderer
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -12,12 +11,14 @@ from .context import ApiContext
 from .exceptions import *
 
 import csv
+import re
 
 
 class CustomAPIView(APIView):
     object_class = None
     return_serializer_class = None
     serializer_class = None
+    enhanced_filters = False
 
     def __init__(self, *args, **kwargs):
         self.request_content = {}
@@ -58,10 +59,53 @@ class CustomAPIView(APIView):
 
     def get_rest_content_filter(self):
 
-        if 'filter' not in self.request_content:
+        request_filter = self.request_content.get('filter')
+
+        if not request_filter:
             raise ApiContentFilterNotProvided()
 
-        return self.request_content.get('filter')
+        if self.enhanced_filters is True:
+            request_filter = self.generate_enhanced_filters(request_filter)
+
+        return request_filter
+
+    @staticmethod
+    def generate_enhanced_filters(request_filter=None):
+        """
+        TODO: Check for security issues
+        """
+        generated_filter = []
+
+        for i, re_filter in enumerate(request_filter):
+            op = '&'
+
+            #  Remove any characters not allowed in variables
+            escaped_expression = re.sub(r'([^A-z]*)', '', re_filter['expr'])
+
+            if i > 0:
+
+                if 'operator' in re_filter:
+                    if re_filter['operator'] == 'or':
+                        op = '|'
+
+                    elif re_filter['operator'] == 'and':
+                        op = '&'
+
+                    else:
+                        raise ApiValueError('unknown operator')
+
+                    generated_filter.append(op)
+                    generated_filter.append("Q(**" + str(escaped_expression) + ")")
+
+                else:
+                    raise ApiValueError('Filter operator not provided')
+
+            else:
+                generated_filter.append("Q(**" + str(escaped_expression) + ")")
+
+        generated_filter = ' '.join(generated_filter)
+
+        return eval(generated_filter)
 
     def get_rest_content_order(self):
 
