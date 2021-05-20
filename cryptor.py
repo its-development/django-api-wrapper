@@ -1,5 +1,5 @@
 import base64
-from env_config import X_OR_KEY
+from .settings import X_OR_KEY
 
 
 def test(data, key):
