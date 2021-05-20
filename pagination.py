@@ -35,6 +35,9 @@ class ApiPaginator:
         offset = self.offset
         limit = offset + self.limit
 
+        if self.total == 0:
+            return []
+
         if offset >= self.total:
             raise ApiValueError('Offset bigger total count.')
 

@@ -8,6 +8,7 @@ from rest_framework.response import Response
 from api.auth_token.models import ExpiringToken
 from api.auth_token.authentication import ExpiringTokenAuthentication
 
+from .settings import ApiSettings
 from .helpers import ApiHelpers
 from .pagination import ApiPaginator
 from .context import ApiContext
@@ -64,7 +65,7 @@ class CustomAPIView(APIView):
 
         request_filter = self.request_content.get('filter')
 
-        if not request_filter:
+        if not isinstance(request_filter, dict) or not isinstance(request_filter, dict):
             raise ApiContentFilterNotProvided()
 
         if self.enhanced_filters is True:
@@ -262,6 +263,8 @@ class CustomCreateView(CustomAPIView):
         serializer = self.serializer_class(data=self.request_data)
 
         if not serializer.is_valid():
+            if ApiSettings.DEBUG:
+                print(serializer.errors)
             raise ApiSerializerInvalid()
 
         created_object = serializer.save()
@@ -320,6 +323,8 @@ class CustomUpdateView(CustomAPIView):
         serializer = self.serializer_class(instance=object_to_update, data=self.request_data, partial=True)
 
         if not serializer.is_valid():
+            if ApiSettings.DEBUG:
+                print(serializer.errors)
             raise ApiSerializerInvalid()
 
         updated_object = serializer.save()

@@ -1,5 +1,5 @@
 import base64
-from .settings import X_OR_KEY
+from .settings import ApiSettings
 
 
 def test(data, key):
@@ -12,7 +12,7 @@ def test(data, key):
 
 
 class ApiCrypto:
-    __KEY = X_OR_KEY
+    __KEY = ApiSettings
 
     @classmethod
     def encode(cls, text):
