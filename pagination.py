@@ -42,7 +42,7 @@ class ApiPaginator:
             raise ApiValueError('Offset bigger total count.')
 
         for i, obj in enumerate(objects[offset:]):
-            if i > limit:
+            if 0 < i > limit:
                 break
 
             if check_object_permission:

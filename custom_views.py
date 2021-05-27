@@ -65,8 +65,10 @@ class CustomAPIView(APIView):
 
         request_filter = self.request_content.get('filter')
 
-        if not isinstance(request_filter, dict) or not isinstance(request_filter, dict):
-            raise ApiContentFilterNotProvided()
+        if not isinstance(request_filter, list) and not isinstance(request_filter, dict):
+            if ApiSettings.DEBUG:
+                print(type(request_filter))
+            raise ApiContentFilterWrongFormat()
 
         if self.enhanced_filters is True:
             request_filter = self.generate_enhanced_filters(request_filter)
@@ -85,7 +87,12 @@ class CustomAPIView(APIView):
 
             #  Remove any characters not allowed in variables
             for key in re_filter['expr']:
-                clean_val = str(re.sub(r'([^A-z]*)', '', re_filter['expr'][key]))
+                if isinstance(re_filter['expr'][key], str):
+                    clean_val = str(re.sub(r'([^A-z]*)', '', str(re_filter['expr'][key])))
+
+                else:
+                    clean_val = re_filter['expr'][key]
+
                 clean_key = re.sub(r'([^A-z]*)', '', key)
                 break
 
@@ -149,6 +156,8 @@ class CustomListView(CustomAPIView):
             elif isinstance(self.request_filter, Q):
                 objects = self.object_class.objects.filter(self.request_filter)
             else:
+                if ApiSettings.DEBUG:
+                    print(type(self.request_filter))
                 raise ApiValueError('Bad filter type')
 
             if self.distinct_query:
