@@ -22,7 +22,7 @@ def custom_exception_handler(exc, context):
             if 'detail' in response.data:
                 messages.append(
                     {
-                        'type': 1,
+                        'type': response.status_code,
                         'message': response.data.pop('detail')
                     }
                 )
