@@ -84,6 +84,8 @@ class CustomAPIView(APIView):
 
         for i, re_filter in enumerate(request_filter):
             op = '&'
+            open_group = ''
+            close_group = ''
 
             #  Remove any characters not allowed in variables
             for key in re_filter['expr']:
@@ -95,6 +97,12 @@ class CustomAPIView(APIView):
 
                 clean_key = re.sub(r'([^A-z]*)', '', key)
                 break
+
+            if 'open' in re_filter:
+                open_group = '('
+
+            elif 'close' in re_filter:
+                close_group = ')'
 
             if i > 0:
 
@@ -109,13 +117,13 @@ class CustomAPIView(APIView):
                         raise ApiValueError('unknown operator')
 
                     generated_filter.append(op)
-                    generated_filter.append("Q(%s='%s')" % (clean_key, clean_val))
+                    generated_filter.append("%sQ(%s='%s')%s" % (open_group, clean_key, clean_val, close_group))
 
                 else:
                     raise ApiValueError('Filter operator not provided')
 
             else:
-                generated_filter.append("Q(%s='%s')" % (clean_key, clean_val))
+                generated_filter.append("%sQ(%s='%s')%s" % (open_group, clean_key, clean_val, close_group))
 
         generated_filter = ' '.join(generated_filter)
 
