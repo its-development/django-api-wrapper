@@ -440,6 +440,21 @@ class CustomExportView(CustomAPIView):
         if not fields:
             fields = [field.name for field in self.object_class._meta.get_fields()]
 
+        tmp_header = request_data.get('header')
+
+        if not tmp_header:
+            raise ApiValueError('Header not provided.')
+
+        if tmp_header and len(tmp_header) != len(fields):
+            raise ApiValueError('Header count is unequal to fields count.')
+
+        header = {}
+
+        for i, field in enumerate(fields):
+            header.update({
+                str(field): str(tmp_header[i])
+            })
+
         collection = self.object_class.objects.filter(**request_filter)
 
         for obj in collection:
@@ -455,15 +470,18 @@ class CustomExportView(CustomAPIView):
             response = HttpResponse(content_type="text/csv")
             response['Content-Disposition'] = 'attachment; filename="export.csv"'
 
-            header = fields
             writer = csv.DictWriter(response, fieldnames=header, delimiter=delimiter)
 
-            writer.writeheader()
+            if header:
+                writer.writerow(header)
+
+            else:
+                writer.writeheader(fields)
 
             for row in collection:
                 row_data = {}
-                for field in header:
-                    row_data[field] = (getattr(row, field))
+                for field in fields:
+                    row_data[field] = (ApiHelpers.rgetattr(row, field))
 
                 writer.writerow(row_data)
 

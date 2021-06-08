@@ -1,4 +1,5 @@
 import binascii
+import functools
 import json
 import os
 
@@ -10,6 +11,13 @@ from api.cryptor import ApiCrypto
 
 
 class ApiHelpers:
+
+    @staticmethod
+    def rgetattr(obj, attr, *args):
+        def _getattr(obj, attr):
+            return getattr(obj, attr, *args)
+
+        return functools.reduce(_getattr, [obj] + attr.split('.'))
 
     @staticmethod
     def get_client_ip(request):
