@@ -20,7 +20,7 @@ class ApiPaginator:
         self.page = int(page) if page else 0
 
         if self.limit is None:
-            raise ApiValueError("ApiPaginator does not got a limmit.")
+            raise ApiValueError("ApiPaginator did not got a limit.")
 
         if self.page is not None:
             self.offset = self.page * self.limit
@@ -29,7 +29,7 @@ class ApiPaginator:
         result_set = []
 
         if not request:
-            raise ApiPaginationError('Unsufficient data provided.')
+            raise ApiPaginationError('Insufficient data provided.')
 
         self.total = objects.count()
         offset = self.offset
@@ -41,8 +41,11 @@ class ApiPaginator:
         if offset >= self.total:
             raise ApiValueError('Offset bigger total count.')
 
+        if self.limit == -1:
+            self.limit = self.total
+
         for i, obj in enumerate(objects[offset:]):
-            if 0 < i > limit:
+            if i > limit:
                 break
 
             if check_object_permission:
