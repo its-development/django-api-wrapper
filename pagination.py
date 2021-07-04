@@ -32,25 +32,23 @@ class ApiPaginator:
             raise ApiPaginationError('Insufficient data provided.')
 
         self.total = objects.count()
-        offset = self.offset
-        limit = offset + self.limit
 
         if self.total == 0:
             return []
 
-        if offset >= self.total:
+        if self.offset >= self.total:
             raise ApiValueError('Offset bigger total count.')
 
         if self.limit == -1:
             self.limit = self.total
 
-        for i, obj in enumerate(objects[offset:]):
-            if i > limit:
+        for i, obj in enumerate(objects[self.offset:]):
+            if i >= self.limit:
                 break
 
             if check_object_permission:
                 if not obj.check_view_perm(request):
-                    limit = limit + 1
+                    self.limit += 1
 
                 else:
                     result_set.append(obj)
