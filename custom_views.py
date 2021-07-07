@@ -1,23 +1,28 @@
 from django.http import HttpResponse
-from django.utils import timezone
+from django.db.models import Q
+
 from rest_framework.renderers import JSONRenderer
 from rest_framework.views import APIView
 from rest_framework.response import Response
+
 from api.auth_token.models import ExpiringToken
 from api.auth_token.authentication import ExpiringTokenAuthentication
 
+from .settings import ApiSettings
 from .helpers import ApiHelpers
 from .pagination import ApiPaginator
 from .context import ApiContext
 from .exceptions import *
 
 import csv
+import re
 
 
 class CustomAPIView(APIView):
     object_class = None
     return_serializer_class = None
     serializer_class = None
+    enhanced_filters = False
 
     def __init__(self, *args, **kwargs):
         self.request_content = {}
@@ -58,10 +63,71 @@ class CustomAPIView(APIView):
 
     def get_rest_content_filter(self):
 
-        if 'filter' not in self.request_content:
-            raise ApiContentFilterNotProvided()
+        request_filter = self.request_content.get('filter')
 
-        return self.request_content.get('filter')
+        if not isinstance(request_filter, list) and not isinstance(request_filter, dict):
+            if ApiSettings.DEBUG:
+                print(type(request_filter))
+            raise ApiContentFilterWrongFormat()
+
+        if self.enhanced_filters is True:
+            request_filter = self.generate_enhanced_filters(request_filter)
+
+        return request_filter
+
+    @staticmethod
+    def generate_enhanced_filters(request_filter=None):
+        """
+        TODO: Check for security issues
+        """
+        generated_filter = []
+
+        for i, re_filter in enumerate(request_filter):
+            op = '&'
+            open_group = ''
+            close_group = ''
+
+            #  Remove any characters not allowed in variables
+            for key in re_filter['expr']:
+                if isinstance(re_filter['expr'][key], str):
+                    clean_val = str(re.sub(r'([^A-z]*)', '', str(re_filter['expr'][key])))
+
+                else:
+                    clean_val = re_filter['expr'][key]
+
+                clean_key = re.sub(r'([^A-z]*)', '', key)
+                break
+
+            if 'open' in re_filter:
+                open_group = '('
+
+            elif 'close' in re_filter:
+                close_group = ')'
+
+            if i > 0:
+
+                if 'operator' in re_filter:
+                    if re_filter['operator'] == 'or':
+                        op = '|'
+
+                    elif re_filter['operator'] == 'and':
+                        op = '&'
+
+                    else:
+                        raise ApiValueError('unknown operator')
+
+                    generated_filter.append(op)
+                    generated_filter.append("%sQ(%s='%s')%s" % (open_group, clean_key, clean_val, close_group))
+
+                else:
+                    raise ApiValueError('Filter operator not provided')
+
+            else:
+                generated_filter.append("%sQ(%s='%s')%s" % (open_group, clean_key, clean_val, close_group))
+
+        generated_filter = ' '.join(generated_filter)
+
+        return eval(generated_filter)
 
     def get_rest_content_order(self):
 
@@ -81,6 +147,7 @@ class CustomAPIView(APIView):
 class CustomListView(CustomAPIView):
     renderer_classes = [JSONRenderer]
     check_object_permission = True
+    distinct_query = False
 
     def __init__(self, *args, **kwargs):
         self.request_filter = {}
@@ -92,7 +159,19 @@ class CustomListView(CustomAPIView):
     def handler(self, request, context):
 
         if self.request_filter:
-            objects = self.object_class.objects.filter(**self.request_filter).order_by(*self.request_order)
+            if isinstance(self.request_filter, dict):
+                objects = self.object_class.objects.filter(**self.request_filter)
+            elif isinstance(self.request_filter, Q):
+                objects = self.object_class.objects.filter(self.request_filter)
+            else:
+                if ApiSettings.DEBUG:
+                    print(type(self.request_filter))
+                raise ApiValueError('Bad filter type')
+
+            if self.distinct_query:
+                objects = objects.distinct()
+
+            objects = objects.order_by(*self.request_order)
 
         else:
             objects = self.object_class.objects.all().order_by(*self.request_order)
@@ -100,7 +179,7 @@ class CustomListView(CustomAPIView):
         paginator = ApiPaginator(self.request_pagination)
 
         result_set = paginator.paginate(objects=objects, request=request,
-                                           check_object_permission=self.check_object_permission)
+                                        check_object_permission=self.check_object_permission)
 
         paginator.update_context(context)
 
@@ -112,7 +191,7 @@ class CustomListView(CustomAPIView):
 
         return request, context
 
-    def post(self, request):
+    def process(self, request):
         context = ApiContext.list()
 
         self.request_content = self.get_rest_request_content(request)
@@ -133,6 +212,9 @@ class CustomListView(CustomAPIView):
             if self.request_content.get('encrypt') is True
             else context,
         )
+
+    def post(self, request):
+        return self.process(request)
 
 
 class CustomGetView(CustomAPIView):
@@ -162,7 +244,7 @@ class CustomGetView(CustomAPIView):
 
         return request, context
 
-    def post(self, request):
+    def process(self, request):
         context = ApiContext.list()
 
         self.request_content = self.get_rest_request_content(request)
@@ -182,6 +264,9 @@ class CustomGetView(CustomAPIView):
             else context,
         )
 
+    def post(self, request):
+        return self.process(request)
+
 
 class CustomCreateView(CustomAPIView):
     renderer_classes = [JSONRenderer]
@@ -192,10 +277,11 @@ class CustomCreateView(CustomAPIView):
         super().__init__(*args, **kwargs)
 
     def handler(self, request, context):
-
         serializer = self.serializer_class(data=self.request_data)
 
         if not serializer.is_valid():
+            if ApiSettings.DEBUG:
+                print(serializer.errors)
             raise ApiSerializerInvalid()
 
         created_object = serializer.save()
@@ -209,7 +295,7 @@ class CustomCreateView(CustomAPIView):
 
         return request, context
 
-    def put(self, request):
+    def process(self, request):
         context = ApiContext.create()
 
         self.request_content = self.get_rest_request_content(request)
@@ -222,6 +308,12 @@ class CustomCreateView(CustomAPIView):
             if self.request_content.get('encrypt') is True
             else context,
         )
+
+    def put(self, request):
+        return self.process(request)
+
+    def post(self, request):
+        return self.process(request)
 
 
 class CustomUpdateView(CustomAPIView):
@@ -248,6 +340,8 @@ class CustomUpdateView(CustomAPIView):
         serializer = self.serializer_class(instance=object_to_update, data=self.request_data, partial=True)
 
         if not serializer.is_valid():
+            if ApiSettings.DEBUG:
+                print(serializer.errors)
             raise ApiSerializerInvalid()
 
         updated_object = serializer.save()
@@ -261,7 +355,7 @@ class CustomUpdateView(CustomAPIView):
 
         return request, context
 
-    def patch(self, request):
+    def process(self, request):
         context = ApiContext.update()
 
         self.request_content = self.get_rest_request_content(request)
@@ -274,6 +368,9 @@ class CustomUpdateView(CustomAPIView):
             if self.request_content.get('encrypt') is True
             else context,
         )
+
+    def patch(self, request):
+        return self.process(request)
 
 
 class CustomDeleteView(CustomAPIView):
@@ -307,7 +404,7 @@ class CustomDeleteView(CustomAPIView):
 
         return request, context
 
-    def post(self, request):
+    def process(self, request):
         context = ApiContext.remove()
 
         self.request_content = self.get_rest_request_content(request)
@@ -320,6 +417,9 @@ class CustomDeleteView(CustomAPIView):
             if self.request_content.get('encrypt') is True
             else context,
         )
+
+    def post(self, request):
+        return self.process(request)
 
 
 class CustomExportView(CustomAPIView):
@@ -340,6 +440,21 @@ class CustomExportView(CustomAPIView):
         if not fields:
             fields = [field.name for field in self.object_class._meta.get_fields()]
 
+        tmp_header = request_data.get('header')
+
+        if not tmp_header:
+            raise ApiValueError('Header not provided.')
+
+        if tmp_header and len(tmp_header) != len(fields):
+            raise ApiValueError('Header count is unequal to fields count.')
+
+        header = {}
+
+        for i, field in enumerate(fields):
+            header.update({
+                str(field): str(tmp_header[i])
+            })
+
         collection = self.object_class.objects.filter(**request_filter)
 
         for obj in collection:
@@ -355,15 +470,18 @@ class CustomExportView(CustomAPIView):
             response = HttpResponse(content_type="text/csv")
             response['Content-Disposition'] = 'attachment; filename="export.csv"'
 
-            header = fields
             writer = csv.DictWriter(response, fieldnames=header, delimiter=delimiter)
 
-            writer.writeheader()
+            if header:
+                writer.writerow(header)
+
+            else:
+                writer.writeheader(fields)
 
             for row in collection:
                 row_data = {}
-                for field in header:
-                    row_data[field] = (getattr(row, field))
+                for field in fields:
+                    row_data[field] = (ApiHelpers.rgetattr(row, field))
 
                 writer.writerow(row_data)
 
@@ -380,7 +498,7 @@ class BasicPasswordAuth(CustomAPIView):
     def _auth_method(self, username, password):
         raise NotImplemented()
 
-    def post(self, request):
+    def process(self, request):
         context = ApiContext.auth()
 
         request_content = ApiHelpers.get_rest_request_content(request)
@@ -410,3 +528,6 @@ class BasicPasswordAuth(CustomAPIView):
         )
 
         return Response(context, )
+
+    def post(self, request):
+        return self.process(request)

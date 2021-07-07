@@ -49,6 +49,12 @@ class ApiContentFilterNotProvided(APIException):
     default_code = 'api_content_filter_not_provided'
 
 
+class ApiContentFilterWrongFormat(APIException):
+    status_code = 500
+    default_detail = 'ApiContentFilterWrongFormat'
+    default_code = 'api_content_filter_wrong_format'
+
+
 class ApiContentOrderNotProvided(APIException):
     status_code = 500
     default_detail = 'ApiContentOrderNotProvided'
