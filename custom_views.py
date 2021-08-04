@@ -6,6 +6,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 
 from api.auth_token.models import ExpiringToken
+from api.auth_token.serializers import ExpiringTokenSerializer
 from api.auth_token.authentication import ExpiringTokenAuthentication
 
 from .settings import ApiSettings
@@ -31,6 +32,11 @@ class CustomAPIView(APIView):
 
     @staticmethod
     def get_rest_request_content(request):
+        """
+
+        :param request:
+        :return request.data:
+        """
         content = {}
 
         if request:
@@ -55,6 +61,10 @@ class CustomAPIView(APIView):
         return content
 
     def get_request_content_data(self):
+        """
+
+        :return self.request_content.data:
+        """
 
         if 'data' not in self.request_content:
             raise ApiContentDataNotProvided()
@@ -62,7 +72,10 @@ class CustomAPIView(APIView):
         return self.request_content.get('data')
 
     def get_rest_content_filter(self):
+        """
 
+        :return:
+        """
         request_filter = self.request_content.get('filter')
 
         if not isinstance(request_filter, list) and not isinstance(request_filter, dict):
@@ -70,7 +83,7 @@ class CustomAPIView(APIView):
                 print(type(request_filter))
             raise ApiContentFilterWrongFormat()
 
-        if self.enhanced_filters is True:
+        if self.enhanced_filters is True and isinstance(request_filter, list):
             request_filter = self.generate_enhanced_filters(request_filter)
 
         return request_filter
@@ -78,7 +91,9 @@ class CustomAPIView(APIView):
     @staticmethod
     def generate_enhanced_filters(request_filter=None):
         """
-        TODO: Check for security issues
+        TODO: check for security issues in eval
+        :param request_filter:
+        :return generated filter expression:
         """
         generated_filter = []
 
@@ -130,6 +145,10 @@ class CustomAPIView(APIView):
         return eval(generated_filter)
 
     def get_rest_content_order(self):
+        """
+
+        :return self.request_content.filter:
+        """
 
         if 'order' not in self.request_content:
             raise ApiContentOrderNotProvided()
@@ -495,6 +514,9 @@ class BasicPasswordAuth(CustomAPIView):
     authentication_classes = []
     permission_classes = []
 
+    model = ExpiringToken
+    model_serializer = ExpiringTokenSerializer
+
     def _auth_method(self, username, password):
         raise NotImplemented()
 
@@ -509,25 +531,80 @@ class BasicPasswordAuth(CustomAPIView):
 
         user = self._auth_method(username=request_data['username'], password=request_data['password'])
         user_ip = ApiHelpers.get_client_ip(request)
+        user_user_agent = ApiHelpers.get_client_user_agent(request)
 
         if not user:
             raise ApiAuthFailed()
 
-        token, action = ExpiringToken.objects.get_or_create(user=user)
-
-        token = ExpiringTokenAuthentication.regenerate(old_token=token, user=user, ip_addr=user_ip)
+        token = self.model.objects.create(user=user, ip_addr=user_ip, user_agent=user_user_agent)
 
         context.update(
             {
                 'success': True,
                 'results': {
                     'user': self.serializer_class(instance=user).data,
-                    'token': token.key
+                    'token': self.model_serializer(instance=token).data
                 }
             }
         )
 
         return Response(context, )
+
+    def post(self, request):
+        return self.process(request)
+
+
+class BasicTokenRefresh(CustomAPIView):
+    authentication_classes = []
+    permission_classes = []
+
+    model = ExpiringToken
+    model_serializer = ExpiringTokenSerializer
+
+    def _auth_method(self, username, password):
+        raise NotImplemented()
+
+    def handler(self, request, context):
+
+        refresh_token = self.request_data.get('refresh_token')
+
+        if not refresh_token:
+            raise ApiValueError('refresh_token not provided')
+
+        try:
+            token = self.model.objects.get(refresh_token=refresh_token)
+        except self.model.DoesNotExist:
+            raise ApiAuthFailed()
+
+        if ExpiringTokenAuthentication.is_token_expired(token.refresh_token_expires, token.refresh_token_valid_until):
+            raise ApiValueError('refresh_token expired')
+
+        token.regenerate()
+
+        context.update(
+            {
+                'success': True,
+                'result': {
+                    'token': self.model_serializer(instance=token).data
+                }
+            }
+        )
+
+        return request, context
+
+    def process(self, request):
+        context = ApiContext.get()
+
+        self.request_content = self.get_rest_request_content(request)
+        self.request_data = self.get_request_content_data()
+
+        request, context = self.handler(request, context)
+
+        return Response(
+            ApiHelpers.encrypt_context(context)
+            if self.request_content.get('encrypt') is True
+            else context,
+        )
 
     def post(self, request):
         return self.process(request)

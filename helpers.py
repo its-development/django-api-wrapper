@@ -30,7 +30,17 @@ class ApiHelpers:
         else:
             ip = request.META.get('REMOTE_ADDR')
 
-        return ip
+        return ip    \
+
+    @staticmethod
+    def get_client_user_agent(request):
+
+        user_agent = request.META.get('HTTP_USER_AGENT')
+
+        if not user_agent:
+            raise ApiValueError("HTTP_USER_AGENT missing.")
+
+        return user_agent
 
     @staticmethod
     def permission_required(permission_name, raise_exception=False):
@@ -50,9 +60,14 @@ class ApiHelpers:
 
         return PermissionRequired
 
-    # TODO: Delete duplicate code
     @staticmethod
     def get_rest_request_content(request):
+        """
+        deprecated
+
+        :param request:
+        :return request.content:
+        """
         content = []
         if request:
             if request.method == 'GET':
