@@ -12,7 +12,7 @@ from .settings import custom_settings
 
 
 class ExpiringTokenAuthentication(TokenAuthentication):
-    keyword = 'Token'
+    keyword = 'token'
 
     def authenticate(self, request):
         user, token = super().authenticate(request)
@@ -28,7 +28,7 @@ class ExpiringTokenAuthentication(TokenAuthentication):
 
     def authenticate_credentials(self, key):
         try:
-            token = ExpiringToken.objects.get(token=key)
+            token = ExpiringToken.objects.get(access_token=key)
         except ExpiringToken.DoesNotExist:
             raise AuthenticationFailed("Invalid Token")
 
@@ -40,7 +40,7 @@ class ExpiringTokenAuthentication(TokenAuthentication):
 
         if token.is_refresh_token_expired:
             token.delete()
-            raise AuthenticationFailed("The Token is expired")
+            raise AuthenticationFailed("The Refresh Token is expired")
 
         token.access_token_expires = timezone.now() + custom_settings.EXPIRING_TOKEN_DURATION
         token.refresh_token_expires = timezone.now() + custom_settings.EXPIRING_REFRESH_TOKEN_DURATION

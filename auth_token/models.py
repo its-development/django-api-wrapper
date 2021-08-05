@@ -12,10 +12,27 @@ from .settings import custom_settings
 def is_time_expired(time) -> bool:
     return timezone.now() > time
 
+
 def generate_key():
     return str(binascii.hexlify(
         os.urandom(custom_settings.EXPIRING_TOKEN_LENGTH)
     ).decode()[0:custom_settings.EXPIRING_TOKEN_LENGTH])
+
+
+def get_default_access_token_expiry():
+    return timezone.now() + custom_settings.EXPIRING_TOKEN_DURATION
+
+
+def get_default_access_token_validity():
+    return timezone.now() + custom_settings.EXPIRING_TOKEN_MAX_LIFETIME
+
+
+def get_default_refresh_token_expiry():
+    return timezone.now() + custom_settings.EXPIRING_REFRESH_TOKEN_DURATION
+
+
+def get_default_refresh_token_validity():
+    return timezone.now() + custom_settings.EXPIRING_REFRESH_TOKEN_MAX_LIFETIME
 
 
 class ExpiringToken(models.Model):
@@ -27,12 +44,12 @@ class ExpiringToken(models.Model):
     id = models.AutoField(primary_key=True)
 
     access_token = models.CharField(default=generate_key, max_length=1024, unique=True)
-    access_token_expires = models.DateTimeField(default=timezone.now)
-    access_token_valid_until = models.DateTimeField(default=timezone.now)
+    access_token_expires = models.DateTimeField(default=get_default_access_token_expiry)
+    access_token_valid_until = models.DateTimeField(default=get_default_access_token_validity)
 
     refresh_token = models.CharField(default=generate_key, max_length=1024)
-    refresh_token_expires = models.DateTimeField(default=timezone.now)
-    refresh_token_valid_until = models.DateTimeField(default=timezone.now)
+    refresh_token_expires = models.DateTimeField(default=get_default_refresh_token_expiry)
+    refresh_token_valid_until = models.DateTimeField(default=get_default_refresh_token_validity)
 
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL, related_name='auth_tokens',
@@ -71,18 +88,6 @@ class ExpiringToken(models.Model):
         if not self.refresh_token:
             self.refresh_token = self.generate_key()
 
-        if not self.access_token_expires:
-            self.access_token_expires = timezone.now() + custom_settings.EXPIRING_TOKEN_DURATION()
-
-        if not self.refresh_token_expires:
-            self.refresh_token_expires = timezone.now() + custom_settings.EXPIRING_REFRESH_TOKEN_DURATION()
-
-        if not self.access_token_valid_until:
-            self.access_token_valid_until = timezone.now() + custom_settings.EXPIRING_TOKEN_MAX_LIFETIME()
-
-        if not self.refresh_token_valid_until:
-            self.refresh_token_valid_until = timezone.now() + custom_settings.EXPIRING_REFRESH_TOKEN_MAX_LIFETIME()
-
         return super(ExpiringToken, self).save(*args, **kwargs)
 
     def delete_expired(self, user):
@@ -91,7 +96,7 @@ class ExpiringToken(models.Model):
                 token.delete()
 
     def regenerate(self):
-        self.token = self.generate_key()
+        self.access_token = self.generate_key()
         self.refresh_token = self.generate_key()
         self.save()
 
