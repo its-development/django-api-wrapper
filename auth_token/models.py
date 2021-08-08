@@ -83,25 +83,29 @@ class ExpiringToken(models.Model):
             user_active_sessions.order_by('created_at').last().delete()
 
         if not self.access_token:
-            self.access_token = self.generate_key()
+            self.access_token = generate_key()
 
         if not self.refresh_token:
-            self.refresh_token = self.generate_key()
+            self.refresh_token = generate_key()
 
         return super(ExpiringToken, self).save(*args, **kwargs)
 
-    def delete_expired(self, user):
-        for token in self.__class__.objects.filter(user=user):
+    @classmethod
+    def delete_expired(cls, user):
+        for token in cls.objects.filter(user=user):
             if token.is_access_token_expired or token.is_refresh_token_expired:
                 token.delete()
 
     def regenerate(self):
-        self.access_token = self.generate_key()
-        self.refresh_token = self.generate_key()
-        self.save()
+        self.access_token = generate_key()
+        self.access_token_expires = get_default_access_token_expiry()
+        self.access_token_valid_until = get_default_access_token_validity()
 
-    def generate_key(self):
-        return generate_key()
+        self.refresh_token = generate_key()
+        self.refresh_token_expires = get_default_refresh_token_expiry()
+        self.refresh_token_valid_until = get_default_refresh_token_validity()
+
+        self.save()
 
     def __str__(self):
         return self.access_token[:30]

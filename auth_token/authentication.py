@@ -30,19 +30,18 @@ class ExpiringTokenAuthentication(TokenAuthentication):
         try:
             token = ExpiringToken.objects.get(access_token=key)
         except ExpiringToken.DoesNotExist:
-            raise AuthenticationFailed("Invalid Token")
+            raise ApiAuthInvalid()
 
         if not token.user.is_active:
             raise AuthenticationFailed("User is not active")
 
         if token.is_access_token_expired:
-            raise AuthenticationFailed("The Token is expired")
+            raise ApiAuthExpired()
 
         if token.is_refresh_token_expired:
             token.delete()
             raise AuthenticationFailed("The Refresh Token is expired")
 
-        token.access_token_expires = timezone.now() + custom_settings.EXPIRING_TOKEN_DURATION
         token.refresh_token_expires = timezone.now() + custom_settings.EXPIRING_REFRESH_TOKEN_DURATION
         token.save()
 

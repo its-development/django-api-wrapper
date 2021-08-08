@@ -27,6 +27,7 @@ class CustomAPIView(APIView):
 
     def __init__(self, *args, **kwargs):
         self.request_content = {}
+        self.request_data = {}
 
         super().__init__(*args, **kwargs)
 
@@ -574,9 +575,10 @@ class BasicTokenRefresh(CustomAPIView):
         try:
             token = self.model.objects.get(refresh_token=refresh_token)
         except self.model.DoesNotExist:
-            raise ApiAuthFailed()
+            raise ApiAuthInvalid()
 
-        if ExpiringTokenAuthentication.is_token_expired(token.refresh_token_expires, token.refresh_token_valid_until):
+        if token.is_refresh_token_expired:
+            token.delete()
             raise ApiValueError('refresh_token expired')
 
         token.regenerate()

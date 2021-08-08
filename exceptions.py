@@ -19,6 +19,18 @@ class ApiAuthFailed(APIException):
     default_code = 'api_auth_failed'
 
 
+class ApiAuthExpired(APIException):
+    status_code = 423
+    default_detail = 'ApiAuthExpired'
+    default_code = 'api_auth_expired'
+
+
+class ApiAuthInvalid(APIException):
+    status_code = 401
+    default_detail = 'ApiAuthInvalid'
+    default_code = 'api_auth_invalid'
+
+
 class ApiExpiringTokenNotFound(APIException):
     status_code = 500
     default_detail = 'ApiExpiringTokenNotFound'
