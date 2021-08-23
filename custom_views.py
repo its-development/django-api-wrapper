@@ -22,6 +22,7 @@ import re
 class CustomAPIView(APIView):
     object_class = None
     return_serializer_class = None
+    user_serializer = None
     serializer_class = None
     enhanced_filters = False
 
@@ -30,6 +31,17 @@ class CustomAPIView(APIView):
         self.request_data = {}
 
         super().__init__(*args, **kwargs)
+
+    def add_user_to_context(self, ctx, request):
+        if not request.user:
+            return
+
+        if not self.user_serializer:
+            return
+
+        ctx.update({
+            'user': self.user_serializer(instance=request.user).data
+        })
 
     @staticmethod
     def get_rest_request_content(request):
@@ -143,7 +155,7 @@ class CustomAPIView(APIView):
 
         generated_filter = ' '.join(generated_filter)
 
-        return eval(generated_filter)
+        return eval(generated_filter) if generated_filter else None
 
     def get_rest_content_order(self):
         """
@@ -221,6 +233,8 @@ class CustomListView(CustomAPIView):
 
         request, context = self.handler(request, context)
 
+        self.add_user_to_context(context, request)
+
         context.update(
             {
                 'success': True,
@@ -257,7 +271,6 @@ class CustomGetView(CustomAPIView):
 
         context.update(
             {
-                'success': True,
                 'result': self.return_serializer_class(obj).data
             }
         )
@@ -271,6 +284,8 @@ class CustomGetView(CustomAPIView):
         self.request_data = self.get_request_content_data()
 
         request, context = self.handler(request, context)
+
+        self.add_user_to_context(context, request)
 
         context.update(
             {
@@ -308,7 +323,6 @@ class CustomCreateView(CustomAPIView):
 
         context.update(
             {
-                'success': True,
                 'result': self.return_serializer_class(instance=created_object).data
             }
         )
@@ -322,6 +336,12 @@ class CustomCreateView(CustomAPIView):
         self.request_data = self.get_request_content_data()
 
         request, context = self.handler(request, context)
+
+        self.add_user_to_context(context, request)
+
+        context.update({
+            'success': True
+        })
 
         return Response(
             ApiHelpers.encrypt_context(context)
@@ -368,7 +388,6 @@ class CustomUpdateView(CustomAPIView):
 
         context.update(
             {
-                'success': True,
                 'result': self.return_serializer_class(instance=updated_object).data
             }
         )
@@ -382,6 +401,12 @@ class CustomUpdateView(CustomAPIView):
         self.request_data = self.get_request_content_data()
 
         request, context = self.handler(request, context)
+
+        self.add_user_to_context(context, request)
+
+        context.update({
+            'success': True
+        })
 
         return Response(
             ApiHelpers.encrypt_context(context)
@@ -416,12 +441,6 @@ class CustomDeleteView(CustomAPIView):
 
         obj_to_delete.delete()
 
-        context.update(
-            {
-                'success': True
-            }
-        )
-
         return request, context
 
     def process(self, request):
@@ -431,6 +450,12 @@ class CustomDeleteView(CustomAPIView):
         self.request_data = self.get_request_content_data()
 
         request, context = self.handler(request, context)
+
+        self.add_user_to_context(context, request)
+
+        context.update({
+            'success': True
+        })
 
         return Response(
             ApiHelpers.encrypt_context(context)
@@ -585,7 +610,6 @@ class BasicTokenRefresh(CustomAPIView):
 
         context.update(
             {
-                'success': True,
                 'result': {
                     'token': self.model_serializer(instance=token).data
                 }
@@ -601,6 +625,10 @@ class BasicTokenRefresh(CustomAPIView):
         self.request_data = self.get_request_content_data()
 
         request, context = self.handler(request, context)
+
+        context.update({
+            'success': True
+        })
 
         return Response(
             ApiHelpers.encrypt_context(context)
