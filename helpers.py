@@ -2,6 +2,7 @@ import binascii
 import functools
 import json
 import os
+from datetime import timedelta
 
 from rest_framework import permissions
 from rest_framework import exceptions
@@ -11,6 +12,11 @@ from api.cryptor import ApiCrypto
 
 
 class ApiHelpers:
+
+    @staticmethod
+    def daterange(date1, date2):
+        for n in range(int((date2 - date1).days) + 1):
+            yield date1 + timedelta(n)
 
     @staticmethod
     def rgetattr(obj, attr, *args):
