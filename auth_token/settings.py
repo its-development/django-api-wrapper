@@ -19,7 +19,7 @@ class CustomSettings(object):
         try:
             val = settings.EXPIRING_TOKEN_DURATION
         except AttributeError:
-            val = timedelta(minutes=30)
+            val = timedelta(minutes=5)
 
         return val
 

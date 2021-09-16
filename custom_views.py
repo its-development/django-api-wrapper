@@ -600,13 +600,14 @@ class BasicTokenRefresh(CustomAPIView):
         try:
             token = self.model.objects.get(refresh_token=refresh_token)
         except self.model.DoesNotExist:
-            raise ApiAuthInvalid()
+            raise ApiValueError('refresh_token_does_not_exist')
 
         if token.is_refresh_token_expired:
             token.delete()
             raise ApiValueError('refresh_token expired')
 
-        token.regenerate()
+        if token.is_access_token_expired:
+            token.regenerate()
 
         context.update(
             {

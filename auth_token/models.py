@@ -37,17 +37,18 @@ def get_default_refresh_token_validity():
 
 class ExpiringToken(models.Model):
     class Meta:
+        abstract = True
         db_table = 'auth_expiry_tokens'
         verbose_name = "Token"
         verbose_name_plural = "Tokens"
 
     id = models.AutoField(primary_key=True)
 
-    access_token = models.CharField(default=generate_key, max_length=1024, unique=True)
+    access_token = models.CharField(default=generate_key, max_length=254, unique=True)
     access_token_expires = models.DateTimeField(default=get_default_access_token_expiry)
     access_token_valid_until = models.DateTimeField(default=get_default_access_token_validity)
 
-    refresh_token = models.CharField(default=generate_key, max_length=1024)
+    refresh_token = models.CharField(default=generate_key, max_length=254)
     refresh_token_expires = models.DateTimeField(default=get_default_refresh_token_expiry)
     refresh_token_valid_until = models.DateTimeField(default=get_default_refresh_token_validity)
 
@@ -57,7 +58,7 @@ class ExpiringToken(models.Model):
     )
 
     ip_addr = models.GenericIPAddressField(default=None, null=True)
-    user_agent = models.CharField(max_length=1024)
+    user_agent = models.CharField(max_length=1024, null=True, default=None)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
