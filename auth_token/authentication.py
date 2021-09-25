@@ -1,5 +1,5 @@
 import datetime
-
+from django.conf import settings
 from django.utils import timezone
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.exceptions import AuthenticationFailed
@@ -7,11 +7,11 @@ from rest_framework.exceptions import AuthenticationFailed
 from api.helpers import ApiHelpers
 from api.exceptions import *
 
-from .models import ExpiringToken
 from .settings import custom_settings
 
 
 class ExpiringTokenAuthentication(TokenAuthentication):
+    model = None
     keyword = 'token'
 
     def authenticate(self, request):
@@ -28,8 +28,8 @@ class ExpiringTokenAuthentication(TokenAuthentication):
 
     def authenticate_credentials(self, key):
         try:
-            token = ExpiringToken.objects.get(access_token=key)
-        except ExpiringToken.DoesNotExist:
+            token = self.model.objects.get(access_token=key)
+        except self.model.DoesNotExist:
             raise ApiAuthInvalid()
 
         if not token.user.is_active:

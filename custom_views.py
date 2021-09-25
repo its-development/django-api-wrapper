@@ -5,10 +5,6 @@ from rest_framework.renderers import JSONRenderer
 from rest_framework.views import APIView
 from rest_framework.response import Response
 
-from api.auth_token.models import ExpiringToken
-from api.auth_token.serializers import ExpiringTokenSerializer
-from api.auth_token.authentication import ExpiringTokenAuthentication
-
 from .settings import ApiSettings
 from .helpers import ApiHelpers
 from .pagination import ApiPaginator
@@ -540,8 +536,8 @@ class BasicPasswordAuth(CustomAPIView):
     authentication_classes = []
     permission_classes = []
 
-    model = ExpiringToken
-    model_serializer = ExpiringTokenSerializer
+    model = None
+    model_serializer = None
 
     def _auth_method(self, username, password):
         raise NotImplemented()
@@ -584,8 +580,8 @@ class BasicTokenRefresh(CustomAPIView):
     authentication_classes = []
     permission_classes = []
 
-    model = ExpiringToken
-    model_serializer = ExpiringTokenSerializer
+    model = None
+    model_serializer = None
 
     def _auth_method(self, username, password):
         raise NotImplemented()

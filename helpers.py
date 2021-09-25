@@ -36,7 +36,7 @@ class ApiHelpers:
         else:
             ip = request.META.get('REMOTE_ADDR')
 
-        return ip    \
+        return ip
 
     @staticmethod
     def get_client_user_agent(request):
