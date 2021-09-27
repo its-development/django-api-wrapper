@@ -481,19 +481,19 @@ class CustomExportView(CustomAPIView):
         if not fields:
             fields = [field.name for field in self.object_class._meta.get_fields()]
 
-        tmp_header = request_data.get('header')
+        fields_translation = request_data.get('header')
 
-        if not tmp_header:
-            raise ApiValueError('Header not provided.')
+        if not fields_translation:
+            fields_translation = fields
 
-        if tmp_header and len(tmp_header) != len(fields):
+        if fields_translation and len(fields_translation) != len(fields):
             raise ApiValueError('Header count is unequal to fields count.')
 
         header = {}
 
         for i, field in enumerate(fields):
             header.update({
-                str(field): str(tmp_header[i])
+                str(field): str(fields_translation[i])
             })
 
         collection = self.object_class.objects.filter(**request_filter)
