@@ -31,7 +31,10 @@ class ApiPaginator:
         if not request:
             raise ApiPaginationError('Insufficient data provided.')
 
-        self.total = objects.count()
+        if isinstance(objects, list):
+            self.total = len(objects)
+        else:
+            self.total = objects.count()
 
         if self.total == 0:
             return []
