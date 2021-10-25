@@ -257,7 +257,7 @@ class CustomGetView(CustomAPIView):
 
     def handler(self, request, context):
 
-        if 'pk' not in self.request_data:
+        if 'id' not in self.request_data and 'pk' not in self.request_data:
             raise ApiContentDataPkNotProvided()
 
         obj = self.object_class.objects.get(**self.request_data)
