@@ -1,5 +1,4 @@
 import binascii
-import datetime
 import os
 
 from django.conf import settings

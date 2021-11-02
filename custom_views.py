@@ -1,3 +1,5 @@
+from django.utils import timezone
+
 from django.http import HttpResponse
 from django.db.models import Q
 
@@ -114,12 +116,12 @@ class CustomAPIView(APIView):
             #  Remove any characters not allowed in variables
             for key in re_filter['expr']:
                 if isinstance(re_filter['expr'][key], str):
-                    clean_val = str(re.sub(r'([^A-z]*)', '', str(re_filter['expr'][key])))
+                    clean_val = str(re.sub(r'([^A-z0-9\-]*)', '', str(re_filter['expr'][key])))
 
                 else:
                     clean_val = re_filter['expr'][key]
 
-                clean_key = re.sub(r'([^A-z]*)', '', key)
+                clean_key = re.sub(r'([^A-z0-9\-]*)', '', key)
                 break
 
             if 'open' in re_filter:
@@ -587,6 +589,7 @@ class BasicTokenRefresh(CustomAPIView):
         raise NotImplemented()
 
     def handler(self, request, context):
+        import django.utils.timezone
 
         refresh_token = self.request_data.get('refresh_token')
 
@@ -603,7 +606,8 @@ class BasicTokenRefresh(CustomAPIView):
             raise ApiValueError('refresh_token expired')
 
         if token.is_access_token_expired:
-            token.regenerate()
+            if token.updated_at + timezone.timedelta(seconds=5) < timezone.now():
+                token.regenerate()
 
         context.update(
             {
