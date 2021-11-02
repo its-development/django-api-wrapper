@@ -16,7 +16,7 @@ class ApiPaginator:
         page = request_pagination.get('page')
 
         self.offset = int(offset) if offset else 0
-        self.limit = int(limit) if limit else 0
+        self.limit = int(limit) if limit else 25
         self.page = int(page) if page else 0
 
         if self.limit is None:
