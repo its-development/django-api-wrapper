@@ -4,14 +4,42 @@ import json
 import os
 from datetime import timedelta
 
+from django.db.models import Q
 from rest_framework import permissions
 from rest_framework import exceptions
 
 from api.exceptions import *
 from api.cryptor import ApiCrypto
 
+import ast
+import operator as op
+
+
+def eval_(node):
+    operators = {ast.Add: op.add, ast.Sub: op.sub, ast.Mult: op.mul,
+                 ast.Div: op.truediv, ast.Pow: op.pow, ast.BitXor: op.xor,
+                 ast.USub: op.neg, ast.BitAnd: op.and_, ast.BitOr: op.or_}
+
+    if isinstance(node, ast.Num):
+        return node.n
+    elif isinstance(node, ast.BinOp):
+        return operators[type(node.op)](eval_(node.left), eval_(node.right))
+    elif isinstance(node, ast.UnaryOp):
+        return operators[type(node.op)](eval_(node.operand))
+    elif isinstance(node, ast.Call):
+        if node.func.id == 'Q':
+            return Q(**{node.keywords[0].arg: node.keywords[0].value.value})
+        else:
+            raise ValueError('eval_ does not support this function.')
+    else:
+        raise TypeError(node)
+
 
 class ApiHelpers:
+    @staticmethod
+    def eval_expr(expr):
+        print(expr)
+        return eval_(ast.parse(expr, mode='eval').body)
 
     @staticmethod
     def daterange(date1, date2):

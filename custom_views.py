@@ -102,7 +102,6 @@ class CustomAPIView(APIView):
     @staticmethod
     def generate_enhanced_filters(request_filter=None):
         """
-        TODO: check for security issues in eval
         :param request_filter:
         :return generated filter expression:
         """
@@ -116,7 +115,7 @@ class CustomAPIView(APIView):
             #  Remove any characters not allowed in variables
             for key in re_filter['expr']:
                 if isinstance(re_filter['expr'][key], str):
-                    clean_val = str(re.sub(r'([^A-z0-9\-]*)', '', str(re_filter['expr'][key])))
+                    clean_val = str(re.sub(r'([^A-z0-9\- ]*)', '', str(re_filter['expr'][key])))
 
                 else:
                     clean_val = re_filter['expr'][key]
@@ -153,11 +152,10 @@ class CustomAPIView(APIView):
 
         generated_filter = ' '.join(generated_filter)
 
-        return eval(generated_filter) if generated_filter else None
+        return ApiHelpers.eval_expr(generated_filter) if generated_filter else None
 
     def get_rest_content_order(self):
         """
-
         :return self.request_content.filter:
         """
 
