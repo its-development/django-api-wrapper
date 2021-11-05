@@ -37,6 +37,20 @@ def eval_(node):
 
 class ApiHelpers:
     @staticmethod
+    def parse_string(val, vars):
+        import re
+
+        res = val
+
+        matches = re.finditer(r'\[(.*?)\]', val)
+
+        for match in matches:
+            var = re.search('(?<=\[%).+?(?=\%])', match.group(0)).group(0)
+            res = res.replace(match.group(0), vars[var])
+
+        return res
+
+    @staticmethod
     def eval_expr(expr):
         print(expr)
         return eval_(ast.parse(expr, mode='eval').body)
