@@ -362,10 +362,12 @@ class CustomUpdateView(CustomAPIView):
 
     def handler(self, request, context):
 
-        if 'pk' not in self.request_data:
+        if 'id' not in self.request_data and 'pk' not in self.request_data:
             raise ApiContentDataPkNotProvided()
 
-        object_to_update = self.object_class.objects.get(pk=self.request_data['pk'])
+        pk = self.request_data.get('id') if self.request_data.get('id') else self.request_data.get('pk')
+
+        object_to_update = self.object_class.objects.get(pk=pk)
 
         if not object_to_update:
             raise ApiObjectNotFound()
@@ -604,7 +606,7 @@ class BasicTokenRefresh(CustomAPIView):
             raise ApiValueError('refresh_token expired')
 
         if token.is_access_token_expired:
-            if token.updated_at + timezone.timedelta(seconds=5) < timezone.now():
+            if token.updated_at + timezone.timedelta(seconds=10) < timezone.now():
                 token.regenerate()
 
         context.update(
