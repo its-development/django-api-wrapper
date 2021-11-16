@@ -37,7 +37,7 @@ def eval_(node):
 
 class ApiHelpers:
     @staticmethod
-    def parse_string(val, vars):
+    def parse_string(val, template_vars):
         import re
 
         res = val
@@ -46,7 +46,7 @@ class ApiHelpers:
 
         for match in matches:
             var = re.search('(?<=\[%).+?(?=\%])', match.group(0)).group(0)
-            res = res.replace(match.group(0), vars[var])
+            res = res.replace(match.group(0), template_vars[var])
 
         return res
 
