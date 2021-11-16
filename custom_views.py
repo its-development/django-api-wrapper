@@ -307,6 +307,9 @@ class CustomCreateView(CustomAPIView):
 
         super().__init__(*args, **kwargs)
 
+    def hook_after_creation(self, request, obj):
+        pass
+
     def handler(self, request, context):
         serializer = self.serializer_class(data=self.request_data)
 
@@ -316,6 +319,8 @@ class CustomCreateView(CustomAPIView):
             raise ApiSerializerInvalid()
 
         created_object = serializer.save()
+
+        self.hook_after_creation(request, created_object)
 
         context.update(
             {
@@ -360,6 +365,9 @@ class CustomUpdateView(CustomAPIView):
 
         super().__init__(*args, **kwargs)
 
+    def hook_after_update(self, request, obj):
+        pass
+
     def handler(self, request, context):
 
         if 'id' not in self.request_data and 'pk' not in self.request_data:
@@ -383,6 +391,8 @@ class CustomUpdateView(CustomAPIView):
             raise ApiSerializerInvalid()
 
         updated_object = serializer.save()
+
+        self.hook_after_update(request, updated_object)
 
         context.update(
             {
