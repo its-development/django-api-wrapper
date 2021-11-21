@@ -7,6 +7,7 @@ from rest_framework.renderers import JSONRenderer
 from rest_framework.views import APIView
 from rest_framework.response import Response
 
+from .models import ApiWrapperModel, ApiWrapperAbstractUser
 from .settings import ApiSettings
 from .helpers import ApiHelpers
 from .pagination import ApiPaginator
@@ -29,6 +30,14 @@ class CustomAPIView(APIView):
         self.request_data = {}
 
         super().__init__(*args, **kwargs)
+
+    def check_serializer_field_perm(self, serializer):
+        for key, obj in serializer.validated_data.items():
+            if isinstance(obj, (ApiWrapperModel, ApiWrapperAbstractUser)):
+                if not obj.check_obj_perm(self.request):
+                    return False
+
+        return True
 
     def add_user_to_context(self, ctx, request):
         if not request.user:
@@ -307,20 +316,23 @@ class CustomCreateView(CustomAPIView):
 
         super().__init__(*args, **kwargs)
 
-    def hook_after_creation(self, request, obj):
+    def hook_after_creation(self, obj):
         pass
 
     def handler(self, request, context):
-        serializer = self.serializer_class(data=self.request_data)
+        serializer = self.serializer_class(data=self.request_data, context={'request': request})
 
         if not serializer.is_valid():
             if ApiSettings.DEBUG:
                 print(serializer.errors)
             raise ApiSerializerInvalid()
 
+        if not self.check_serializer_field_perm(serializer):
+            raise ApiPermissionError()
+
         created_object = serializer.save()
 
-        self.hook_after_creation(request, created_object)
+        self.hook_after_creation(created_object)
 
         context.update(
             {
@@ -365,7 +377,7 @@ class CustomUpdateView(CustomAPIView):
 
         super().__init__(*args, **kwargs)
 
-    def hook_after_update(self, request, obj):
+    def hook_after_update(self, obj):
         pass
 
     def handler(self, request, context):
@@ -392,7 +404,7 @@ class CustomUpdateView(CustomAPIView):
 
         updated_object = serializer.save()
 
-        self.hook_after_update(request, updated_object)
+        self.hook_after_update(updated_object)
 
         context.update(
             {
