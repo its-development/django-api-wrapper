@@ -6,6 +6,7 @@ from django.db import models
 from django.utils import timezone
 
 from .settings import custom_settings
+from ..models import ApiWrapperModel
 
 
 def is_time_expired(time) -> bool:
@@ -34,7 +35,7 @@ def get_default_refresh_token_validity():
     return timezone.now() + custom_settings.EXPIRING_REFRESH_TOKEN_MAX_LIFETIME
 
 
-class ExpiringToken(models.Model):
+class ExpiringToken(ApiWrapperModel):
     class Meta:
         abstract = True
         db_table = 'auth_expiry_tokens'
