@@ -180,6 +180,19 @@ class CustomAPIView(APIView):
 
         return self.request_content.get('pagination')
 
+    def handler(self, request, context):
+        raise NotImplementedError()
+
+    def process(self, request):
+        context = {}
+        request, context = self.handler(request, context)
+
+        return Response(
+            ApiHelpers.encrypt_context(context)
+            if self.request_content.get('encrypt') is True
+            else context,
+        )
+
 
 class CustomListView(CustomAPIView):
     renderer_classes = [JSONRenderer]
