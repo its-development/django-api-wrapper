@@ -52,7 +52,6 @@ class ApiHelpers:
 
     @staticmethod
     def eval_expr(expr):
-        print(expr)
         return eval_(ast.parse(expr, mode='eval').body)
 
     @staticmethod
@@ -107,80 +106,6 @@ class ApiHelpers:
                 return True
 
         return PermissionRequired
-
-    @staticmethod
-    def get_rest_request_content(request):
-        """
-        deprecated
-
-        :param request:
-        :return request.content:
-        """
-        content = []
-        if request:
-            if request.method == 'GET':
-                content = request.GET
-
-            elif request.method == 'PUT':
-                content = request.data
-
-            elif request.method == 'DELETE':
-                content = request.data
-
-            elif request.method == 'POST':
-                content = request.data
-
-            elif request.method == 'PATCH':
-                content = request.data
-
-        if not content:
-            content = []
-
-        return content
-
-    @staticmethod
-    def get_request_content_data(content):
-        data = {}
-
-        if 'data' not in content:
-            raise ApiContentDataNotProvided()
-
-        data = content['data']
-
-        return data
-
-    @staticmethod
-    def get_rest_content_filter(content):
-        filter = {}
-
-        if 'filter' not in content:
-            raise ApiContentFilterNotProvided()
-
-        filter = content['filter']
-
-        return filter
-
-    @staticmethod
-    def get_rest_content_order(content):
-        order = []
-
-        if 'order' not in content:
-            raise ApiContentOrderNotProvided()
-
-        order = content.get('order')
-
-        return order
-
-    @staticmethod
-    def get_rest_content_pagination(content):
-        pagination = {}
-
-        if 'pagination' not in content:
-            raise ApiContentPaginationNotProvided()
-
-        pagination = content['pagination']
-
-        return pagination
 
     @staticmethod
     def encrypt_context(context):

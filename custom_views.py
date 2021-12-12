@@ -50,8 +50,10 @@ class CustomAPIView(APIView):
             'user': self.user_serializer(instance=request.user).data
         })
 
-    @staticmethod
-    def get_rest_request_content(request):
+    def hook_request_data(self, data):
+        return data
+
+    def get_rest_request_content(self):
         """
 
         :param request:
@@ -59,26 +61,23 @@ class CustomAPIView(APIView):
         """
         content = {}
 
-        if request:
-            if request.method == 'GET':
-                content = request.GET
+        if self.request:
+            if self.request.method == 'GET':
+                content = self.request.GET
 
-            elif request.method == 'PUT':
-                content = request.data
+            elif self.request.method == 'PUT':
+                content = self.request.data
 
-            elif request.method == 'DELETE':
-                content = request.data
+            elif self.request.method == 'DELETE':
+                content = self.request.data
 
-            elif request.method == 'POST':
-                content = request.data
+            elif self.request.method == 'POST':
+                content = self.request.data
 
-            elif request.method == 'PATCH':
-                content = request.data
+            elif self.request.method == 'PATCH':
+                content = self.request.data
 
-        if not content:
-            content = []
-
-        return content
+        self.request_content = content
 
     def get_request_content_data(self):
         """
@@ -86,10 +85,9 @@ class CustomAPIView(APIView):
         :return self.request_content.data:
         """
 
-        if 'data' not in self.request_content:
-            raise ApiContentDataNotProvided()
+        data = self.request_content.get('data', {})
 
-        return self.request_content.get('data')
+        self.request_data = self.hook_request_data(data)
 
     def get_rest_content_filter(self):
         """
@@ -184,7 +182,7 @@ class CustomAPIView(APIView):
         raise NotImplementedError()
 
     def process(self, request):
-        context = {}
+        context = ApiContext.default()
         request, context = self.handler(request, context)
 
         return Response(
@@ -244,7 +242,7 @@ class CustomListView(CustomAPIView):
     def process(self, request):
         context = ApiContext.list()
 
-        self.request_content = self.get_rest_request_content(request)
+        self.get_rest_request_content()
         self.request_filter = self.get_rest_content_filter()
         self.request_pagination = self.get_rest_content_pagination()
         self.request_order = self.get_rest_content_order()
@@ -298,8 +296,8 @@ class CustomGetView(CustomAPIView):
     def process(self, request):
         context = ApiContext.list()
 
-        self.request_content = self.get_rest_request_content(request)
-        self.request_data = self.get_request_content_data()
+        self.get_rest_request_content()
+        self.get_request_content_data()
 
         request, context = self.handler(request, context)
 
@@ -358,8 +356,8 @@ class CustomCreateView(CustomAPIView):
     def process(self, request):
         context = ApiContext.create()
 
-        self.request_content = self.get_rest_request_content(request)
-        self.request_data = self.get_request_content_data()
+        self.get_rest_request_content()
+        self.get_request_content_data()
 
         request, context = self.handler(request, context)
 
@@ -430,8 +428,8 @@ class CustomUpdateView(CustomAPIView):
     def process(self, request):
         context = ApiContext.update()
 
-        self.request_content = self.get_rest_request_content(request)
-        self.request_data = self.get_request_content_data()
+        self.get_rest_request_content()
+        self.get_request_content_data()
 
         request, context = self.handler(request, context)
 
@@ -479,8 +477,8 @@ class CustomDeleteView(CustomAPIView):
     def process(self, request):
         context = ApiContext.remove()
 
-        self.request_content = self.get_rest_request_content(request)
-        self.request_data = self.get_request_content_data()
+        self.get_rest_request_content()
+        self.get_request_content_data()
 
         request, context = self.handler(request, context)
 
@@ -504,21 +502,21 @@ class CustomExportView(CustomAPIView):
     renderer_classes = [JSONRenderer]
 
     def post(self, request):
-        request_content = ApiHelpers.get_rest_request_content(request)
-        request_data = ApiHelpers.get_request_content_data(request_content)
-        request_filter = ApiHelpers.get_rest_content_filter(request_content)
+        self.get_rest_request_content()
+        self.get_request_content_data()
+        request_filter = ApiHelpers.get_rest_content_filter(self.request_content)
 
-        file_type = request_data.get('file_type')
+        file_type = self.request_data.get('file_type')
 
         if not file_type:
             raise ApiValueError('file_type not provided.')
 
-        fields = request_data.get('fields')
+        fields = self.request_data.get('fields')
 
         if not fields:
             fields = [field.name for field in self.object_class._meta.get_fields()]
 
-        fields_translation = request_data.get('header')
+        fields_translation = self.request_data.get('header')
 
         if not fields_translation:
             fields_translation = fields
@@ -540,7 +538,7 @@ class CustomExportView(CustomAPIView):
                 collection = collection.exclude(pk=obj.pk)
 
         if file_type == "csv":
-            delimiter = request_data.get('delimiter')
+            delimiter = self.request_data.get('delimiter')
 
             if not delimiter:
                 raise ApiValueError('delimiter not provided')
@@ -582,13 +580,15 @@ class BasicPasswordAuth(CustomAPIView):
     def process(self, request):
         context = ApiContext.auth()
 
-        request_content = ApiHelpers.get_rest_request_content(request)
-        request_data = ApiHelpers.get_request_content_data(request_content)
+        self.get_rest_request_content()
+        self.get_request_content_data()
 
-        if 'username' not in request_data or 'password' not in request_data:
+        print(self.request_data)
+
+        if 'username' not in self.request_data or 'password' not in self.request_data:
             raise ApiAuthUsernameOrPasswordNotProvided()
 
-        user = self._auth_method(username=request_data['username'], password=request_data['password'])
+        user = self._auth_method(username=self.request_data['username'], password=self.request_data['password'])
         user_ip = ApiHelpers.get_client_ip(request)
         user_user_agent = ApiHelpers.get_client_user_agent(request)
 
@@ -624,7 +624,7 @@ class BasicTokenRefresh(CustomAPIView):
         raise NotImplemented()
 
     def handler(self, request, context):
-        import django.utils.timezone
+        from django.utils import timezone
 
         refresh_token = self.request_data.get('refresh_token')
 
@@ -657,8 +657,8 @@ class BasicTokenRefresh(CustomAPIView):
     def process(self, request):
         context = ApiContext.get()
 
-        self.request_content = self.get_rest_request_content(request)
-        self.request_data = self.get_request_content_data()
+        self.get_rest_request_content()
+        self.get_request_content_data()
 
         request, context = self.handler(request, context)
 
