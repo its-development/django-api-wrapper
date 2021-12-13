@@ -28,6 +28,8 @@ class CustomAPIView(APIView):
     def __init__(self, *args, **kwargs):
         self.request_content = {}
         self.request_data = {}
+        self.request_filter = {}
+        self.request_order = {}
 
         super().__init__(*args, **kwargs)
 
@@ -504,7 +506,7 @@ class CustomExportView(CustomAPIView):
     def post(self, request):
         self.get_rest_request_content()
         self.get_request_content_data()
-        request_filter = ApiHelpers.get_rest_content_filter(self.request_content)
+        self.request_filter = self.get_rest_content_filter()
 
         file_type = self.request_data.get('file_type')
 
@@ -531,7 +533,7 @@ class CustomExportView(CustomAPIView):
                 str(field): str(fields_translation[i])
             })
 
-        collection = self.object_class.objects.filter(**request_filter)
+        collection = self.object_class.objects.filter(**self.request_filter)
 
         for obj in collection:
             if not obj.check_export_perm(request):
