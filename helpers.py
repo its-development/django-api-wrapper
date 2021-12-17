@@ -119,3 +119,7 @@ class ApiHelpers:
             }
         )
         return {'data': ApiCrypto.encode(json.dumps(context, sort_keys=True, indent=1))}
+
+    @staticmethod
+    def round_float(value, precision) -> str:
+        return ("%." + str(precision) + "f") % (value,)
