@@ -16,7 +16,7 @@ class ApiPaginator:
         page = request_pagination.get('page')
 
         self.offset = int(offset) if offset else 0
-        self.limit = int(limit) if limit else 0
+        self.limit = int(limit) if limit else 25
         self.page = int(page) if page else 0
 
         if self.limit is None:
@@ -31,7 +31,10 @@ class ApiPaginator:
         if not request:
             raise ApiPaginationError('Insufficient data provided.')
 
-        self.total = objects.count()
+        if isinstance(objects, list):
+            self.total = len(objects)
+        else:
+            self.total = objects.count()
 
         if self.total == 0:
             return []
