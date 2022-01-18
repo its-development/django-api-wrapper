@@ -461,10 +461,12 @@ class CustomDeleteView(CustomAPIView):
 
     def handler(self, request, context):
 
-        if 'pk' not in self.request_data:
+        if 'id' not in self.request_data and 'pk' not in self.request_data:
             raise ApiContentDataPkNotProvided()
 
-        obj_to_delete = self.object_class.objects.get(pk=self.request_data['pk'])
+        pk = self.request_data.get('id') if self.request_data.get('id') else self.request_data.get('pk')
+
+        obj_to_delete = self.object_class.objects.get(pk=pk)
 
         if not obj_to_delete:
             raise ApiObjectNotFound()
@@ -487,6 +489,7 @@ class CustomDeleteView(CustomAPIView):
         self.add_user_to_context(context, request)
 
         context.update({
+            'status': 200,
             'success': True
         })
 
@@ -585,8 +588,6 @@ class BasicPasswordAuth(CustomAPIView):
         self.get_rest_request_content()
         self.get_request_content_data()
 
-        print(self.request_data)
-
         if 'username' not in self.request_data or 'password' not in self.request_data:
             raise ApiAuthUsernameOrPasswordNotProvided()
 
@@ -602,6 +603,7 @@ class BasicPasswordAuth(CustomAPIView):
         context.update(
             {
                 'success': True,
+                'status': 200,
                 'results': {
                     'user': self.serializer_class(instance=user).data,
                     'token': self.model_serializer(instance=token).data
