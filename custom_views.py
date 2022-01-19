@@ -236,7 +236,8 @@ class CustomListView(CustomAPIView):
         result_set = [self.return_serializer_class(instance=result).data for result in result_set]
 
         context.update({
-            'results': result_set
+            'results': result_set,
+            'columns': [*self.return_serializer_class.Meta.fields]
         })
 
         return request, context
