@@ -7,28 +7,36 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('auth_token', '0007_auto_20210804_2159'),
+        ("auth_token", "0007_auto_20210804_2159"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='expiringtoken',
-            name='access_token_expires',
-            field=models.DateTimeField(default=api.auth_token.models.get_default_access_token_expiry),
+            model_name="expiringtoken",
+            name="access_token_expires",
+            field=models.DateTimeField(
+                default=api.auth_token.models.get_default_access_token_expiry
+            ),
         ),
         migrations.AlterField(
-            model_name='expiringtoken',
-            name='access_token_valid_until',
-            field=models.DateTimeField(default=api.auth_token.models.get_default_access_token_validity),
+            model_name="expiringtoken",
+            name="access_token_valid_until",
+            field=models.DateTimeField(
+                default=api.auth_token.models.get_default_access_token_validity
+            ),
         ),
         migrations.AlterField(
-            model_name='expiringtoken',
-            name='refresh_token_expires',
-            field=models.DateTimeField(default=api.auth_token.models.get_default_refresh_token_expiry),
+            model_name="expiringtoken",
+            name="refresh_token_expires",
+            field=models.DateTimeField(
+                default=api.auth_token.models.get_default_refresh_token_expiry
+            ),
         ),
         migrations.AlterField(
-            model_name='expiringtoken',
-            name='refresh_token_valid_until',
-            field=models.DateTimeField(default=api.auth_token.models.get_default_refresh_token_validity),
+            model_name="expiringtoken",
+            name="refresh_token_valid_until",
+            field=models.DateTimeField(
+                default=api.auth_token.models.get_default_refresh_token_validity
+            ),
         ),
     ]

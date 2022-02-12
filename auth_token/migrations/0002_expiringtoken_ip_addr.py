@@ -6,13 +6,13 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('auth_token', '0001_initial'),
+        ("auth_token", "0001_initial"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='expiringtoken',
-            name='ip_addr',
+            model_name="expiringtoken",
+            name="ip_addr",
             field=models.GenericIPAddressField(default=None, null=True),
         ),
     ]

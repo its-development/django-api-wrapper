@@ -7,18 +7,20 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('auth_token', '0005_auto_20210728_2052'),
+        ("auth_token", "0005_auto_20210728_2052"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='expiringtoken',
-            name='token',
-            field=models.CharField(default=api.auth_token.models.generate_key, max_length=1024, unique=True),
+            model_name="expiringtoken",
+            name="token",
+            field=models.CharField(
+                default=api.auth_token.models.generate_key, max_length=1024, unique=True
+            ),
         ),
         migrations.AddField(
-            model_name='expiringtoken',
-            name='id',
+            model_name="expiringtoken",
+            name="id",
             field=models.AutoField(default=1, primary_key=True, serialize=False),
             preserve_default=False,
         ),

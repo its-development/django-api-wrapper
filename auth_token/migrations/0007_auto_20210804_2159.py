@@ -7,44 +7,46 @@ import django.utils.timezone
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('auth_token', '0006_auto_20210728_2138'),
+        ("auth_token", "0006_auto_20210728_2138"),
     ]
 
     operations = [
         migrations.RenameField(
-            model_name='expiringtoken',
-            old_name='token',
-            new_name='access_token',
+            model_name="expiringtoken",
+            old_name="token",
+            new_name="access_token",
         ),
         migrations.RenameField(
-            model_name='expiringtoken',
-            old_name='token_expires',
-            new_name='access_token_expires',
+            model_name="expiringtoken",
+            old_name="token_expires",
+            new_name="access_token_expires",
         ),
         migrations.RenameField(
-            model_name='expiringtoken',
-            old_name='token_valid_until',
-            new_name='access_token_valid_until',
+            model_name="expiringtoken",
+            old_name="token_valid_until",
+            new_name="access_token_valid_until",
         ),
         migrations.RemoveField(
-            model_name='expiringtoken',
-            name='created',
+            model_name="expiringtoken",
+            name="created",
         ),
         migrations.AddField(
-            model_name='expiringtoken',
-            name='created_at',
-            field=models.DateTimeField(auto_now_add=True, default=django.utils.timezone.now),
+            model_name="expiringtoken",
+            name="created_at",
+            field=models.DateTimeField(
+                auto_now_add=True, default=django.utils.timezone.now
+            ),
             preserve_default=False,
         ),
         migrations.AddField(
-            model_name='expiringtoken',
-            name='updated_at',
+            model_name="expiringtoken",
+            name="updated_at",
             field=models.DateTimeField(auto_now=True),
         ),
         migrations.AddField(
-            model_name='expiringtoken',
-            name='user_agent',
-            field=models.CharField(default='', max_length=1024),
+            model_name="expiringtoken",
+            name="user_agent",
+            field=models.CharField(default="", max_length=1024),
             preserve_default=False,
         ),
     ]
