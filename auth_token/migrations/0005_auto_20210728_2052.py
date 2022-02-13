@@ -7,28 +7,28 @@ import django.utils.timezone
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('auth_token', '0004_auto_20210728_2051'),
+        ("auth_token", "0004_auto_20210728_2051"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='expiringtoken',
-            name='refresh_token_expires',
+            model_name="expiringtoken",
+            name="refresh_token_expires",
             field=models.DateTimeField(default=django.utils.timezone.now),
         ),
         migrations.AlterField(
-            model_name='expiringtoken',
-            name='refresh_token_valid_until',
+            model_name="expiringtoken",
+            name="refresh_token_valid_until",
             field=models.DateTimeField(default=django.utils.timezone.now),
         ),
         migrations.AlterField(
-            model_name='expiringtoken',
-            name='token_expires',
+            model_name="expiringtoken",
+            name="token_expires",
             field=models.DateTimeField(default=django.utils.timezone.now),
         ),
         migrations.AlterField(
-            model_name='expiringtoken',
-            name='token_valid_until',
+            model_name="expiringtoken",
+            name="token_valid_until",
             field=models.DateTimeField(default=django.utils.timezone.now),
         ),
     ]

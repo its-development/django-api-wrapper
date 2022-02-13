@@ -6,11 +6,11 @@ from django.db import migrations
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('auth_token', '0008_auto_20210805_2031'),
+        ("auth_token", "0008_auto_20210805_2031"),
     ]
 
     operations = [
         migrations.DeleteModel(
-            name='ExpiringToken',
+            name="ExpiringToken",
         ),
     ]

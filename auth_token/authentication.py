@@ -12,7 +12,7 @@ from .settings import custom_settings
 
 class ExpiringTokenAuthentication(TokenAuthentication):
     model = None
-    keyword = 'token'
+    keyword = "token"
 
     def authenticate(self, request):
         user, token = super().authenticate(request)
@@ -22,7 +22,7 @@ class ExpiringTokenAuthentication(TokenAuthentication):
 
         if not token.ip_addr or token.ip_addr != ApiHelpers.get_client_ip(request):
             token.delete()
-            raise ApiValueError('IP missmatch')
+            raise ApiValueError("IP missmatch")
 
         return user, token
 
@@ -42,7 +42,9 @@ class ExpiringTokenAuthentication(TokenAuthentication):
             token.delete()
             raise AuthenticationFailed("The Refresh Token is expired")
 
-        token.refresh_token_expires = timezone.now() + custom_settings.EXPIRING_REFRESH_TOKEN_DURATION
+        token.refresh_token_expires = (
+            timezone.now() + custom_settings.EXPIRING_REFRESH_TOKEN_DURATION
+        )
         token.save()
 
         return token.user, token

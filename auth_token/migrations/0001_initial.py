@@ -15,18 +15,37 @@ class Migration(migrations.Migration):
 
     operations = [
         migrations.CreateModel(
-            name='ExpiringToken',
+            name="ExpiringToken",
             fields=[
-                ('key', models.CharField(max_length=255, primary_key=True, serialize=False, verbose_name='Key')),
-                ('created', models.DateTimeField(auto_now_add=True, verbose_name='Created')),
-                ('expires', models.DateTimeField(verbose_name='Expires in')),
-                ('valid_until', models.DateTimeField(verbose_name='Valid until')),
-                ('user', models.OneToOneField(on_delete=django.db.models.deletion.CASCADE, related_name='auth_token', to=settings.AUTH_USER_MODEL, verbose_name='User')),
+                (
+                    "key",
+                    models.CharField(
+                        max_length=255,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="Key",
+                    ),
+                ),
+                (
+                    "created",
+                    models.DateTimeField(auto_now_add=True, verbose_name="Created"),
+                ),
+                ("expires", models.DateTimeField(verbose_name="Expires in")),
+                ("valid_until", models.DateTimeField(verbose_name="Valid until")),
+                (
+                    "user",
+                    models.OneToOneField(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="auth_token",
+                        to=settings.AUTH_USER_MODEL,
+                        verbose_name="User",
+                    ),
+                ),
             ],
             options={
-                'verbose_name': 'Token',
-                'verbose_name_plural': 'Tokens',
-                'db_table': 'auth_expiry_tokens',
+                "verbose_name": "Token",
+                "verbose_name_plural": "Tokens",
+                "db_table": "auth_expiry_tokens",
             },
         ),
     ]

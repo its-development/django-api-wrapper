@@ -9,50 +9,65 @@ from django.utils.timezone import utc
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('auth_token', '0003_auto_20210726_2221'),
+        ("auth_token", "0003_auto_20210726_2221"),
     ]
 
     operations = [
         migrations.RemoveField(
-            model_name='expiringtoken',
-            name='expires',
+            model_name="expiringtoken",
+            name="expires",
         ),
         migrations.RemoveField(
-            model_name='expiringtoken',
-            name='key',
+            model_name="expiringtoken",
+            name="key",
         ),
         migrations.RemoveField(
-            model_name='expiringtoken',
-            name='valid_until',
+            model_name="expiringtoken",
+            name="valid_until",
         ),
         migrations.AddField(
-            model_name='expiringtoken',
-            name='refresh_token',
-            field=models.CharField(default=api.auth_token.models.generate_key, max_length=1024),
+            model_name="expiringtoken",
+            name="refresh_token",
+            field=models.CharField(
+                default=api.auth_token.models.generate_key, max_length=1024
+            ),
         ),
         migrations.AddField(
-            model_name='expiringtoken',
-            name='refresh_token_expires',
-            field=models.DateTimeField(default=datetime.datetime(2021, 7, 28, 18, 51, 18, 34053, tzinfo=utc)),
+            model_name="expiringtoken",
+            name="refresh_token_expires",
+            field=models.DateTimeField(
+                default=datetime.datetime(2021, 7, 28, 18, 51, 18, 34053, tzinfo=utc)
+            ),
         ),
         migrations.AddField(
-            model_name='expiringtoken',
-            name='refresh_token_valid_until',
-            field=models.DateTimeField(default=datetime.datetime(2021, 7, 28, 18, 51, 18, 34053, tzinfo=utc)),
+            model_name="expiringtoken",
+            name="refresh_token_valid_until",
+            field=models.DateTimeField(
+                default=datetime.datetime(2021, 7, 28, 18, 51, 18, 34053, tzinfo=utc)
+            ),
         ),
         migrations.AddField(
-            model_name='expiringtoken',
-            name='token',
-            field=models.CharField(default=api.auth_token.models.generate_key, max_length=1024, primary_key=True, serialize=False),
+            model_name="expiringtoken",
+            name="token",
+            field=models.CharField(
+                default=api.auth_token.models.generate_key,
+                max_length=1024,
+                primary_key=True,
+                serialize=False,
+            ),
         ),
         migrations.AddField(
-            model_name='expiringtoken',
-            name='token_expires',
-            field=models.DateTimeField(default=datetime.datetime(2021, 7, 28, 18, 51, 18, 34053, tzinfo=utc)),
+            model_name="expiringtoken",
+            name="token_expires",
+            field=models.DateTimeField(
+                default=datetime.datetime(2021, 7, 28, 18, 51, 18, 34053, tzinfo=utc)
+            ),
         ),
         migrations.AddField(
-            model_name='expiringtoken',
-            name='token_valid_until',
-            field=models.DateTimeField(default=datetime.datetime(2021, 7, 28, 18, 51, 18, 34053, tzinfo=utc)),
+            model_name="expiringtoken",
+            name="token_valid_until",
+            field=models.DateTimeField(
+                default=datetime.datetime(2021, 7, 28, 18, 51, 18, 34053, tzinfo=utc)
+            ),
         ),
     ]

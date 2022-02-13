@@ -78,7 +78,6 @@ class CustomSettings(object):
 
         return val
 
-
     @property
     def EXPIRING_TOKEN_MAX_SESSIONS(self):
         """
