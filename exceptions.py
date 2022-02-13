@@ -13,6 +13,10 @@ class ApiError(APIException):
     status_code = 500
 
 
+class ApiTypeError(APIException):
+    status_code = 500
+
+
 class ApiAuthFailed(APIException):
     status_code = 401
     default_detail = "ApiAuthFailed"

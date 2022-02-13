@@ -1,3 +1,6 @@
+from pprint import pprint
+
+from django.db.models.functions import Lower
 from django.utils import timezone
 
 from django.http import HttpResponse
@@ -178,7 +181,7 @@ class CustomAPIView(APIView):
         if "order" not in self.request_content:
             raise ApiContentOrderNotProvided()
 
-        return self.request_content.get("order")
+        return [*self.request_content.get("order"), ""]
 
     def get_rest_content_pagination(self):
 
@@ -228,10 +231,14 @@ class CustomListView(CustomAPIView):
             if self.distinct_query:
                 objects = objects.distinct()
 
-            objects = objects.order_by(*self.request_order)
+            objects = objects
 
         else:
-            objects = self.object_class.objects.all().order_by(*self.request_order)
+            objects = self.object_class.objects.all()
+
+        objects = objects.order_by(
+            *ApiHelpers.eval_expr("(%s)" % (", ".join(self.request_order)))
+        )
 
         paginator = ApiPaginator(self.request_pagination)
 
@@ -391,6 +398,12 @@ class CustomCreateView(CustomAPIView):
         return self.process(request)
 
 
+class CustomAddView(CustomCreateView):
+    # Proxy class
+
+    pass
+
+
 class CustomUpdateView(CustomAPIView):
     renderer_classes = [JSONRenderer]
 
@@ -460,6 +473,12 @@ class CustomUpdateView(CustomAPIView):
 
     def patch(self, request):
         return self.process(request)
+
+
+class CustomChangeView(CustomUpdateView):
+    # Proxy class
+
+    pass
 
 
 class CustomDeleteView(CustomAPIView):

@@ -1,3 +1,5 @@
+from pprint import pprint
+
 import binascii
 import functools
 import json
@@ -5,6 +7,7 @@ import os
 from datetime import timedelta
 
 from django.db.models import Q
+from django.db.models.functions import Lower, Upper
 from rest_framework import permissions
 from rest_framework import exceptions
 
@@ -37,10 +40,18 @@ def eval_(node):
     elif isinstance(node, ast.Call):
         if node.func.id == "Q":
             return Q(**{node.keywords[0].arg: node.keywords[0].value.value})
+        elif node.func.id == "Lower":
+            return Lower(node.args[0].value)
+        elif node.func.id == "Upper":
+            return Upper(node.args[0].value)
         else:
-            raise ValueError("eval_ does not support this function.")
+            raise ApiValueError("eval_ does not support this function. Hi exploiter :)")
+    elif isinstance(node, ast.Constant):
+        return node.value
+    elif isinstance(node, ast.Tuple):
+        return [eval_(elt) for elt in node.elts]
     else:
-        raise TypeError(node)
+        raise ApiTypeError("eval_ does not support this node. Hi exploiter :)")
 
 
 class ApiHelpers:
