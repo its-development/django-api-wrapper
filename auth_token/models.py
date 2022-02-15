@@ -44,8 +44,6 @@ class ExpiringToken(ApiWrapperModel):
         verbose_name = "Token"
         verbose_name_plural = "Tokens"
 
-    id = models.AutoField(primary_key=True)
-
     access_token = models.CharField(default=generate_key, max_length=254, unique=True)
     access_token_expires = models.DateTimeField(default=get_default_access_token_expiry)
     access_token_valid_until = models.DateTimeField(
