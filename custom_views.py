@@ -33,6 +33,7 @@ class CustomAPIView(APIView):
         self.request_data = {}
         self.request_filter = {}
         self.request_order = {}
+        self.request_flags = {}
 
         super().__init__(*args, **kwargs)
 
@@ -55,6 +56,10 @@ class CustomAPIView(APIView):
 
     def hook_request_data(self, data):
         return data
+
+    def get_rest_content_flags(self):
+        self.request_flags = self.request_content.get("flags", {})
+        return self.request_flags
 
     def get_rest_request_content(self):
         """
@@ -317,6 +322,7 @@ class CustomGetView(CustomAPIView):
         context = ApiContext.list()
 
         self.get_rest_request_content()
+        self.get_rest_content_flags()
         self.get_request_content_data()
 
         request, context = self.handler(request, context)
@@ -377,6 +383,7 @@ class CustomCreateView(CustomAPIView):
         context = ApiContext.create()
 
         self.get_rest_request_content()
+        self.get_rest_content_flags()
         self.get_request_content_data()
 
         request, context = self.handler(request, context)
@@ -400,7 +407,6 @@ class CustomCreateView(CustomAPIView):
 
 class CustomAddView(CustomCreateView):
     # Proxy class
-
     pass
 
 
@@ -458,6 +464,7 @@ class CustomUpdateView(CustomAPIView):
 
         self.get_rest_request_content()
         self.get_request_content_data()
+        self.get_rest_content_flags()
 
         request, context = self.handler(request, context)
 
@@ -477,7 +484,6 @@ class CustomUpdateView(CustomAPIView):
 
 class CustomChangeView(CustomUpdateView):
     # Proxy class
-
     pass
 
 
@@ -517,6 +523,7 @@ class CustomDeleteView(CustomAPIView):
 
         self.get_rest_request_content()
         self.get_request_content_data()
+        self.get_rest_content_flags()
 
         request, context = self.handler(request, context)
 
@@ -616,6 +623,7 @@ class BasicPasswordAuth(CustomAPIView):
 
         self.get_rest_request_content()
         self.get_request_content_data()
+        self.get_rest_content_flags()
 
         if "username" not in self.request_data or "password" not in self.request_data:
             raise ApiAuthUsernameOrPasswordNotProvided()
@@ -695,6 +703,7 @@ class BasicTokenRefresh(CustomAPIView):
 
         self.get_rest_request_content()
         self.get_request_content_data()
+        self.get_rest_content_flags()
 
         request, context = self.handler(request, context)
 

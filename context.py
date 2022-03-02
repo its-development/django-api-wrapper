@@ -23,14 +23,14 @@ class ApiContext:
     @classmethod
     def create(cls):
         ctx = cls.default_context.copy()
-        ctx.update({"result": None})
+        ctx.update({"result": None, "flags": {}})
 
         return ctx
 
     @classmethod
     def update(cls):
         ctx = cls.default_context.copy()
-        ctx.update({"result": None})
+        ctx.update({"result": None, "flags": {}})
 
         return ctx
 
