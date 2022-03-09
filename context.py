@@ -9,7 +9,7 @@ class ApiContext:
     @classmethod
     def list(cls):
         ctx = cls.default_context.copy()
-        ctx.update({"results": None})
+        ctx.update({"results": []})
 
         return ctx
 
