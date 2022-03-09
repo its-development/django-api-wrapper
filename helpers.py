@@ -1,5 +1,3 @@
-from pprint import pprint
-
 import binascii
 import functools
 import json
