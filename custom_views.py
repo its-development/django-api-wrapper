@@ -1,8 +1,3 @@
-from pprint import pprint
-
-from django.db.models.functions import Lower
-from django.utils import timezone
-
 from django.http import HttpResponse
 from django.db.models import Q
 
@@ -38,7 +33,7 @@ class CustomAPIView(APIView):
         super().__init__(*args, **kwargs)
 
     def check_serializer_field_perm(self, serializer):
-        for key, obj in serializer.validated_data.items():
+        for _, obj in serializer.validated_data.items():
             if isinstance(obj, (ApiWrapperModel, ApiWrapperAbstractUser)):
                 if not obj.check_obj_perm(self.request):
                     return False
@@ -102,17 +97,21 @@ class CustomAPIView(APIView):
 
         :return:
         """
-        request_filter = self.request_content.get("filter")
+        request_filter = self.request_content.get("filter", None)
 
-        if not isinstance(request_filter, list) and not isinstance(
-            request_filter, dict
-        ):
+        if type(request_filter) not in [list, dict, str]:
             if ApiSettings.DEBUG:
                 print(type(request_filter))
             raise ApiContentFilterWrongFormat()
 
+        if type(request_filter) in [list, str] and not self.enhanced_filters:
+            raise ApiContentFilterWrongFormat("Enhanced filters are disabled.")
+
         if self.enhanced_filters is True and isinstance(request_filter, list):
             request_filter = self.generate_enhanced_filters(request_filter)
+
+        if self.enhanced_filters and isinstance(request_filter, str):
+            request_filter = ApiHelpers.eval_expr(request_filter)
 
         return request_filter
 
@@ -195,6 +194,27 @@ class CustomAPIView(APIView):
 
         return self.request_content.get("pagination")
 
+    def filter_objects(self, manager):
+        if self.request_filter:
+            if isinstance(self.request_filter, dict):
+                objects = manager.filter(**self.request_filter)
+            elif isinstance(self.request_filter, Q):
+                objects = manager.filter(self.request_filter)
+            else:
+                if ApiSettings.DEBUG:
+                    print(type(self.request_filter))
+                raise ApiValueError("Bad filter type")
+
+            if self.distinct_query:
+                objects = objects.distinct()
+
+            objects = objects
+
+        else:
+            objects = manager.all()
+
+        return objects
+
     def handler(self, request, context):
         raise NotImplementedError()
 
@@ -222,25 +242,7 @@ class CustomListView(CustomAPIView):
         super().__init__(*args, **kwargs)
 
     def handler(self, request, context):
-
-        if self.request_filter:
-            if isinstance(self.request_filter, dict):
-                objects = self.object_class.objects.filter(**self.request_filter)
-            elif isinstance(self.request_filter, Q):
-                objects = self.object_class.objects.filter(self.request_filter)
-            else:
-                if ApiSettings.DEBUG:
-                    print(type(self.request_filter))
-                raise ApiValueError("Bad filter type")
-
-            if self.distinct_query:
-                objects = objects.distinct()
-
-            objects = objects
-
-        else:
-            objects = self.object_class.objects.all()
-
+        objects = self.filter_objects(self.object_class.objects)
         objects = objects.order_by(
             *ApiHelpers.eval_expr("(%s)" % (", ".join(self.request_order)))
         )
@@ -283,6 +285,7 @@ class CustomListView(CustomAPIView):
         context.update(
             {
                 "success": True,
+                "status": 200,
             }
         )
 
