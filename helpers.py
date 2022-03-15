@@ -138,3 +138,10 @@ class ApiHelpers:
     @staticmethod
     def round_float(value, precision) -> str:
         return ("%." + str(precision) + "f") % (value,)
+
+    @staticmethod
+    def list_get(l, i, default):
+        try:
+            return l[i]
+        except IndexError:
+            return default
