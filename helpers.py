@@ -2,6 +2,7 @@ import binascii
 import functools
 import json
 import os
+import re
 from datetime import timedelta
 
 from django.db.models import Q
@@ -27,6 +28,7 @@ def eval_(node):
         ast.USub: op.neg,
         ast.BitAnd: op.and_,
         ast.BitOr: op.or_,
+        ast.Invert: op.invert,
     }
 
     if isinstance(node, ast.Num):
@@ -55,8 +57,6 @@ def eval_(node):
 class ApiHelpers:
     @staticmethod
     def parse_string(val, template_vars):
-        import re
-
         res = val
 
         matches = re.finditer(r"\[(.*?)\]", val)
