@@ -92,28 +92,26 @@ class CustomAPIView(APIView):
 
         self.request_data = self.hook_request_data(data)
 
-    def get_rest_content_filter(self):
-        """
-
-        :return:
-        """
-        request_filter = self.request_content.get("filter", None)
-
+    def parse_filter(self, request_filter):
         if type(request_filter) not in [list, dict, str]:
             if ApiSettings.DEBUG:
                 print(type(request_filter))
             raise ApiContentFilterWrongFormat()
 
-        if type(request_filter) in [list, str] and not self.enhanced_filters:
+        if type(request_filter) in [str] and not self.enhanced_filters:
             raise ApiContentFilterWrongFormat("Enhanced filters are disabled.")
-
-        if self.enhanced_filters is True and isinstance(request_filter, list):
-            request_filter = self.generate_enhanced_filters(request_filter)
 
         if self.enhanced_filters and isinstance(request_filter, str):
             request_filter = ApiHelpers.eval_expr(request_filter)
 
         return request_filter
+
+    def get_rest_content_filter(self):
+        """
+
+        :return:
+        """
+        return self.parse_filter(self.request_content.get("filter", None))
 
     @staticmethod
     def generate_enhanced_filters(request_filter=None):
@@ -194,24 +192,25 @@ class CustomAPIView(APIView):
 
         return self.request_content.get("pagination")
 
-    def filter_objects(self, manager):
-        if self.request_filter:
-            if isinstance(self.request_filter, dict):
-                objects = manager.filter(**self.request_filter)
-            elif isinstance(self.request_filter, Q):
-                objects = manager.filter(self.request_filter)
+    def filter_queryset(self, manager, fil=None):
+
+        if fil:
+            if isinstance(fil, dict):
+                objects = manager.filter(**fil)
+            elif isinstance(fil, Q):
+                objects = manager.filter(fil)
             else:
                 if ApiSettings.DEBUG:
-                    print(type(self.request_filter))
+                    print(type(fil))
                 raise ApiValueError("Bad filter type")
-
-            if self.distinct_query:
-                objects = objects.distinct()
 
             objects = objects
 
         else:
             objects = manager.all()
+
+        if self.distinct_query:
+            objects = objects.distinct()
 
         return objects
 
@@ -242,7 +241,10 @@ class CustomListView(CustomAPIView):
         super().__init__(*args, **kwargs)
 
     def handler(self, request, context):
-        objects = self.filter_objects(self.object_class.objects)
+        objects = self.filter_queryset(
+            self.object_class.objects,
+            self.request_filter,
+        )
         objects = objects.order_by(
             *ApiHelpers.eval_expr("(%s)" % (", ".join(self.request_order)))
         )
