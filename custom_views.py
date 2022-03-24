@@ -202,7 +202,7 @@ class CustomAPIView(APIView):
             else:
                 if ApiSettings.DEBUG:
                     print(type(fil))
-                raise ApiValueError("Bad filter type")
+                raise ApiContentFilterWrongFormat()
 
             objects = objects
 
@@ -213,6 +213,25 @@ class CustomAPIView(APIView):
             objects = objects.distinct()
 
         return objects
+
+    def get_queryset(self, manager, fil=None):
+        if fil:
+            if isinstance(fil, dict):
+                obj = manager.get(**fil)
+            elif isinstance(fil, Q):
+                obj = manager.get(fil)
+            else:
+                if ApiSettings.DEBUG:
+                    print(type(fil))
+                raise ApiContentFilterWrongFormat()
+
+        else:
+            raise ApiContentFilterNotProvided()
+
+        if not obj:
+            raise self.object_class.DoesNotExist()
+
+        return obj
 
     def handler(self, request, context):
         raise NotImplementedError()
@@ -310,11 +329,10 @@ class CustomGetView(CustomAPIView):
         super().__init__(*args, **kwargs)
 
     def handler(self, request, context):
-
-        if "id" not in self.request_data and "pk" not in self.request_data:
-            raise ApiContentDataPkNotProvided()
-
-        obj = self.object_class.objects.get(**self.request_data)
+        obj = self.get_queryset(
+            self.object_class.objects,
+            self.request_filter,
+        )
 
         if not obj.check_view_perm(request):
             raise ApiPermissionError("Object permission denied.")
@@ -324,13 +342,18 @@ class CustomGetView(CustomAPIView):
         return request, context
 
     def process(self, request):
-        context = ApiContext.list()
+        context = ApiContext.get()
 
         self.get_rest_request_content()
+        self.request_filter = self.get_rest_content_filter()
         self.get_rest_content_flags()
         self.get_request_content_data()
 
-        request, context = self.handler(request, context)
+        try:
+            request, context = self.handler(request, context)
+        except Exception as err:
+            if ApiSettings.DEBUG:
+                print(err)
 
         self.add_user_to_context(context, request)
 
