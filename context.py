@@ -16,7 +16,7 @@ class ApiContext:
     @classmethod
     def get(cls):
         ctx = cls.default_context.copy()
-        ctx.update({"result": None})
+        ctx.update({"result": None, "flags": {}})
 
         return ctx
 
