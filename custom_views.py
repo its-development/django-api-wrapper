@@ -22,6 +22,7 @@ class CustomAPIView(APIView):
     user_serializer = None
     serializer_class = None
     enhanced_filters = False
+    check_object_permission = True
 
     def __init__(self, *args, **kwargs):
         self.request_content = {}
@@ -249,7 +250,6 @@ class CustomAPIView(APIView):
 
 class CustomListView(CustomAPIView):
     renderer_classes = [JSONRenderer]
-    check_object_permission = True
     distinct_query = False
 
     def __init__(self, *args, **kwargs):
@@ -334,7 +334,7 @@ class CustomGetView(CustomAPIView):
             self.request_filter,
         )
 
-        if not obj.check_view_perm(request):
+        if self.check_object_permission and not obj.check_view_perm(request):
             raise ApiPermissionError("Object permission denied.")
 
         context.update({"result": self.return_serializer_class(obj).data})
@@ -384,6 +384,9 @@ class CustomCreateView(CustomAPIView):
     def hook_after_creation(self, obj):
         pass
 
+    def hook_before_creation(self, tmp_obj):
+        pass
+
     def handler(self, request, context):
         serializer = self.serializer_class(
             data=self.request_data, context={"request": request}
@@ -398,14 +401,16 @@ class CustomCreateView(CustomAPIView):
             raise ApiPermissionError()
 
         tmp_object = self.object_class(**serializer.validated_data)
-        if not tmp_object.check_add_perm(request):
+        self.hook_before_creation(tmp_object)
+        if self.check_object_permission and not tmp_object.check_add_perm(request):
             raise ApiPermissionError()
 
-        created_object = tmp_object.save()
-        self.hook_after_creation(created_object)
+        tmp_object.save()
+
+        self.hook_after_creation(tmp_object)
 
         context.update(
-            {"result": self.return_serializer_class(instance=created_object).data}
+            {"result": self.return_serializer_class(instance=tmp_object).data}
         )
 
         return request, context
