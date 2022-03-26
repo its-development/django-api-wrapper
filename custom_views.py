@@ -397,8 +397,11 @@ class CustomCreateView(CustomAPIView):
         if not self.check_serializer_field_perm(serializer):
             raise ApiPermissionError()
 
-        created_object = serializer.save()
+        tmp_object = self.object_class(**serializer.validated_data)
+        if not tmp_object.check_add_perm(request):
+            raise ApiPermissionError()
 
+        created_object = tmp_object.save()
         self.hook_after_creation(created_object)
 
         context.update(
