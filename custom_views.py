@@ -349,11 +349,7 @@ class CustomGetView(CustomAPIView):
         self.get_rest_content_flags()
         self.get_request_content_data()
 
-        try:
-            request, context = self.handler(request, context)
-        except Exception as err:
-            if ApiSettings.DEBUG:
-                print(err)
+        request, context = self.handler(request, context)
 
         self.add_user_to_context(context, request)
 
