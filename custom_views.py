@@ -4,6 +4,7 @@ from django.db.models import Q
 from rest_framework.renderers import JSONRenderer
 from rest_framework.views import APIView
 from rest_framework.response import Response
+from rest_framework import status
 
 from .models import ApiWrapperModel, ApiWrapperAbstractUser
 from .settings import ApiSettings
@@ -398,6 +399,7 @@ class CustomCreateView(CustomAPIView):
 
         tmp_object = self.object_class(**serializer.validated_data)
         self.hook_before_creation(tmp_object)
+
         if self.check_object_permission and not tmp_object.check_add_perm(request):
             raise ApiPermissionError()
 
@@ -428,6 +430,7 @@ class CustomCreateView(CustomAPIView):
             ApiHelpers.encrypt_context(context)
             if self.request_content.get("encrypt") is True
             else context,
+            status=status.HTTP_201_CREATED,
         )
 
     def put(self, request):
