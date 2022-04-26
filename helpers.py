@@ -39,7 +39,10 @@ def eval_(node):
         return operators[type(node.op)](eval_(node.operand))
     elif isinstance(node, ast.Call):
         if node.func.id == "Q":
-            return Q(**{node.keywords[0].arg: node.keywords[0].value.value})
+            if isinstance(node.keywords[0].value, ast.Constant):
+                return Q(**{node.keywords[0].arg: node.keywords[0].value.value})
+            elif isinstance(node.keywords[0].value, ast.Tuple):
+                return Q(**{node.keywords[0].arg: eval_(node.keywords[0].value)})
         elif node.func.id == "Lower":
             return Lower(node.args[0].value)
         elif node.func.id == "Upper":
