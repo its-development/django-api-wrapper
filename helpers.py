@@ -72,6 +72,9 @@ class ApiHelpers:
 
     @staticmethod
     def eval_expr(expr):
+        if not expr:
+            return None
+
         return eval_(ast.parse(expr, mode="eval").body)
 
     @staticmethod
