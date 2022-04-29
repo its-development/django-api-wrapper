@@ -94,6 +94,8 @@ class CustomAPIView(APIView):
 
         self.request_data = self.hook_request_data(data)
 
+        return self.request_data
+
     def parse_filter(self, request_filter):
         if type(request_filter) not in [list, dict, str]:
             if ApiSettings.DEBUG:
@@ -307,7 +309,82 @@ class CustomListView(CustomAPIView):
         context.update(
             {
                 "success": True,
-                "status": 200,
+                "status": status.HTTP_200_OK,
+            }
+        )
+
+        return Response(
+            ApiHelpers.encrypt_context(context)
+            if self.request_content.get("encrypt") is True
+            else context,
+        )
+
+    def post(self, request):
+        return self.process(request)
+
+
+class CustomValueListView(CustomAPIView):
+    renderer_classes = [JSONRenderer]
+    distinct_query = False
+
+    def __init__(self, *args, **kwargs):
+        self.request_filter = {}
+        self.request_pagination = {}
+        self.request_order = []
+        self.request_data = {}
+
+        super().__init__(*args, **kwargs)
+
+    def handler(self, request, context):
+        objects = self.filter_queryset(
+            self.object_class.objects,
+            self.request_filter,
+        )
+        objects = objects.order_by(
+            *ApiHelpers.eval_expr("(%s)" % (", ".join(self.request_order)))
+        )
+
+        paginator = ApiPaginator(self.request_pagination)
+
+        result_set = paginator.paginate(
+            objects=objects,
+            request=request,
+            check_object_permission=self.check_object_permission,
+        )
+        paginator.update_context(context)
+
+        result_set = [
+            ApiHelpers.rgetattr(result, self.request_data.get("value"))
+            for result in result_set
+        ]
+
+        context.update(
+            {
+                "results": result_set,
+                "columns": [self.request_data.get("value")],
+            }
+        )
+
+        return request, context
+
+    def process(self, request):
+        context = ApiContext.list()
+
+        self.get_rest_request_content()
+        self.get_request_content_data()
+
+        self.request_filter = self.get_rest_content_filter()
+        self.request_pagination = self.get_rest_content_pagination()
+        self.request_order = self.get_rest_content_order()
+
+        request, context = self.handler(request, context)
+
+        self.add_user_to_context(context, request)
+
+        context.update(
+            {
+                "success": True,
+                "status": status.HTTP_200_OK,
             }
         )
 
