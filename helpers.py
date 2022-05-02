@@ -43,6 +43,8 @@ def eval_(node):
                 return Q(**{node.keywords[0].arg: node.keywords[0].value.value})
             elif isinstance(node.keywords[0].value, ast.Tuple):
                 return Q(**{node.keywords[0].arg: eval_(node.keywords[0].value)})
+            elif isinstance(node.keywords[0].value, ast.List):
+                return Q(**{node.keywords[0].arg: eval_(node.keywords[0].value)})
         elif node.func.id == "Lower":
             return Lower(node.args[0].value)
         elif node.func.id == "Upper":
@@ -52,6 +54,8 @@ def eval_(node):
     elif isinstance(node, ast.Constant):
         return node.value
     elif isinstance(node, ast.Tuple):
+        return [eval_(elt) for elt in node.elts]
+    elif isinstance(node, ast.List):
         return [eval_(elt) for elt in node.elts]
     else:
         raise ApiTypeError("eval_ does not support this node. Hi exploiter :)")
