@@ -530,6 +530,9 @@ class CustomUpdateView(CustomAPIView):
 
         super().__init__(*args, **kwargs)
 
+    def hook_before_update(self, obj):
+        pass
+
     def hook_after_update(self, obj):
         pass
 
@@ -551,6 +554,8 @@ class CustomUpdateView(CustomAPIView):
 
         if not object_to_update.check_change_perm(request):
             raise ApiPermissionError("Object permission denied.")
+
+        self.hook_before_update(object_to_update)
 
         serializer = self.serializer_class(
             instance=object_to_update, data=self.request_data, partial=True
