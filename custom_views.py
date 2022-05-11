@@ -1,3 +1,5 @@
+from pprint import pprint
+
 from django.http import HttpResponse
 from django.db.models import Q
 
@@ -325,7 +327,7 @@ class CustomListView(CustomAPIView):
 
 class CustomValueListView(CustomAPIView):
     renderer_classes = [JSONRenderer]
-    distinct_query = False
+    distinct_query = True
 
     def __init__(self, *args, **kwargs):
         self.request_filter = {}
@@ -429,13 +431,12 @@ class CustomGetView(CustomAPIView):
 
         request, context = self.handler(request, context)
 
+        if isinstance(context, HttpResponse):
+            return context
+
         self.add_user_to_context(context, request)
 
-        context.update(
-            {
-                "success": True,
-            }
-        )
+        context.update({"success": True})
 
         return Response(
             ApiHelpers.encrypt_context(context)
