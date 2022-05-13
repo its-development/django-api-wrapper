@@ -630,9 +630,9 @@ class CustomDeleteView(CustomAPIView):
         )
 
         pk_set = (
-            self.request_data.get("id_set")
-            if self.request_data.get("id_set")
-            else self.request_data.get("pk_set")
+            self.request_data.get("id_set", [])
+            if self.request_data.get("id_set", [])
+            else self.request_data.get("pk_set", [])
         )
 
         if len(pk_set) > 0:
