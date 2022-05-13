@@ -615,7 +615,12 @@ class CustomDeleteView(CustomAPIView):
 
     def handler(self, request, context):
 
-        if "id" not in self.request_data and "pk" not in self.request_data:
+        if (
+            "id" not in self.request_data
+            and "pk" not in self.request_data
+            and "id_set" not in self.request_data
+            and "pk_set" not in self.request_data
+        ):
             raise ApiContentDataPkNotProvided()
 
         pk = (
@@ -624,15 +629,34 @@ class CustomDeleteView(CustomAPIView):
             else self.request_data.get("pk")
         )
 
-        obj_to_delete = self.object_class.objects.get(pk=pk)
+        pk_set = (
+            self.request_data.get("id_set")
+            if self.request_data.get("id_set")
+            else self.request_data.get("pk_set")
+        )
 
-        if not obj_to_delete:
-            raise ApiObjectNotFound()
+        if len(pk_set) > 0:
+            for _pk in pk_set:
+                obj_to_delete = self.object_class.objects.get(pk=_pk)
 
-        if not obj_to_delete.check_delete_perm(request):
-            raise ApiPermissionError("Object permission denied.")
+                if not obj_to_delete:
+                    raise ApiObjectNotFound()
 
-        obj_to_delete.delete()
+                if not obj_to_delete.check_delete_perm(request):
+                    continue
+
+                obj_to_delete.delete()
+
+        elif pk:
+            obj_to_delete = self.object_class.objects.get(pk=pk)
+
+            if not obj_to_delete:
+                raise ApiObjectNotFound()
+
+            if not obj_to_delete.check_delete_perm(request):
+                raise ApiPermissionError("Object permission denied.")
+
+            obj_to_delete.delete()
 
         return request, context
 
