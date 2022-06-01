@@ -36,7 +36,7 @@ class List(CustomListView):
 
 ## Encryption
 
-Since we dont want to depend on to much libraries, we've added a simple but effective XOR-Encryption.
+Since we don't want to depend on too many libraries, we've added a simple but effective XOR-Encryption.
 
 The encryption is also bytes-capable and allows file encryption.
 
@@ -49,13 +49,9 @@ encrypted_text = ApiCrypto.encode(plain_text)
 decrypted_text = ApiCrypto.decode(encrypted_text)
 ~~~
 
-## License
-
-There is no license yet.
-
 ### Contact Information
 
-For help or issues using the django-api-wrapper, please submit a GitHub issue.
+For help or issues using the django-api-wrapper, please submit a GitHub Issue.
 
 For other communications related to the django-api-wrapper, please contact us (`mail@its-development.de`).
 

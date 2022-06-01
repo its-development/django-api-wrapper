@@ -1,5 +1,6 @@
 from rest_framework.views import exception_handler
 from api.context import ApiContext
+from api.settings import ApiSettings
 
 
 def custom_exception_handler(exc, context):
@@ -19,20 +20,17 @@ def custom_exception_handler(exc, context):
 
         if response.data is not None:
 
-            if 'detail' in response.data:
+            if "detail" in response.data:
                 messages.append(
                     {
-                        'type': response.status_code,
-                        'message': response.data.pop('detail')
+                        "type": response.status_code,
+                        "message": response.data.pop("detail")
+                        if ApiSettings.DEBUG
+                        else "",
                     }
                 )
 
         response.data = ApiContext.default()
-        response.data.update(
-            {
-                'status': response.status_code,
-                'messages': messages
-            }
-        )
+        response.data.update({"status": response.status_code, "messages": messages})
 
     return response
