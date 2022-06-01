@@ -1,14 +1,12 @@
 from pprint import pprint
 
-from django.db.models.functions import Lower
-from django.utils import timezone
-
 from django.http import HttpResponse
 from django.db.models import Q
 
 from rest_framework.renderers import JSONRenderer
 from rest_framework.views import APIView
 from rest_framework.response import Response
+from rest_framework import status
 
 from .models import ApiWrapperModel, ApiWrapperAbstractUser
 from .settings import ApiSettings
@@ -27,17 +25,19 @@ class CustomAPIView(APIView):
     user_serializer = None
     serializer_class = None
     enhanced_filters = False
+    check_object_permission = True
 
     def __init__(self, *args, **kwargs):
         self.request_content = {}
         self.request_data = {}
         self.request_filter = {}
         self.request_order = {}
+        self.request_flags = {}
 
         super().__init__(*args, **kwargs)
 
     def check_serializer_field_perm(self, serializer):
-        for key, obj in serializer.validated_data.items():
+        for _, obj in serializer.validated_data.items():
             if isinstance(obj, (ApiWrapperModel, ApiWrapperAbstractUser)):
                 if not obj.check_obj_perm(self.request):
                     return False
@@ -55,6 +55,10 @@ class CustomAPIView(APIView):
 
     def hook_request_data(self, data):
         return data
+
+    def get_rest_content_flags(self):
+        self.request_flags = self.request_content.get("flags", {})
+        return self.request_flags
 
     def get_rest_request_content(self):
         """
@@ -92,24 +96,28 @@ class CustomAPIView(APIView):
 
         self.request_data = self.hook_request_data(data)
 
+        return self.request_data
+
+    def parse_filter(self, request_filter):
+        if type(request_filter) not in [list, dict, str]:
+            if ApiSettings.DEBUG:
+                print(type(request_filter))
+            raise ApiContentFilterWrongFormat()
+
+        if type(request_filter) in [str] and not self.enhanced_filters:
+            raise ApiContentFilterWrongFormat("Enhanced filters are disabled.")
+
+        if self.enhanced_filters and isinstance(request_filter, str):
+            request_filter = ApiHelpers.eval_expr(request_filter)
+
+        return request_filter
+
     def get_rest_content_filter(self):
         """
 
         :return:
         """
-        request_filter = self.request_content.get("filter")
-
-        if not isinstance(request_filter, list) and not isinstance(
-            request_filter, dict
-        ):
-            if ApiSettings.DEBUG:
-                print(type(request_filter))
-            raise ApiContentFilterWrongFormat()
-
-        if self.enhanced_filters is True and isinstance(request_filter, list):
-            request_filter = self.generate_enhanced_filters(request_filter)
-
-        return request_filter
+        return self.parse_filter(self.request_content.get("filter", None))
 
     @staticmethod
     def generate_enhanced_filters(request_filter=None):
@@ -190,6 +198,47 @@ class CustomAPIView(APIView):
 
         return self.request_content.get("pagination")
 
+    def filter_queryset(self, manager, fil=None):
+
+        if fil:
+            if isinstance(fil, dict):
+                objects = manager.filter(**fil)
+            elif isinstance(fil, Q):
+                objects = manager.filter(fil)
+            else:
+                if ApiSettings.DEBUG:
+                    print(type(fil))
+                raise ApiContentFilterWrongFormat()
+
+            objects = objects
+
+        else:
+            objects = manager.all()
+
+        if self.distinct_query:
+            objects = objects.distinct()
+
+        return objects
+
+    def get_queryset(self, manager, fil=None):
+        if fil:
+            if isinstance(fil, dict):
+                obj = manager.get(**fil)
+            elif isinstance(fil, Q):
+                obj = manager.get(fil)
+            else:
+                if ApiSettings.DEBUG:
+                    print(type(fil))
+                raise ApiContentFilterWrongFormat()
+
+        else:
+            raise ApiContentFilterNotProvided()
+
+        if not obj:
+            raise self.object_class.DoesNotExist()
+
+        return obj
+
     def handler(self, request, context):
         raise NotImplementedError()
 
@@ -206,7 +255,6 @@ class CustomAPIView(APIView):
 
 class CustomListView(CustomAPIView):
     renderer_classes = [JSONRenderer]
-    check_object_permission = True
     distinct_query = False
 
     def __init__(self, *args, **kwargs):
@@ -217,25 +265,10 @@ class CustomListView(CustomAPIView):
         super().__init__(*args, **kwargs)
 
     def handler(self, request, context):
-
-        if self.request_filter:
-            if isinstance(self.request_filter, dict):
-                objects = self.object_class.objects.filter(**self.request_filter)
-            elif isinstance(self.request_filter, Q):
-                objects = self.object_class.objects.filter(self.request_filter)
-            else:
-                if ApiSettings.DEBUG:
-                    print(type(self.request_filter))
-                raise ApiValueError("Bad filter type")
-
-            if self.distinct_query:
-                objects = objects.distinct()
-
-            objects = objects
-
-        else:
-            objects = self.object_class.objects.all()
-
+        objects = self.filter_queryset(
+            self.object_class.objects,
+            self.request_filter,
+        )
         objects = objects.order_by(
             *ApiHelpers.eval_expr("(%s)" % (", ".join(self.request_order)))
         )
@@ -278,6 +311,82 @@ class CustomListView(CustomAPIView):
         context.update(
             {
                 "success": True,
+                "status": status.HTTP_200_OK,
+            }
+        )
+
+        return Response(
+            ApiHelpers.encrypt_context(context)
+            if self.request_content.get("encrypt") is True
+            else context,
+        )
+
+    def post(self, request):
+        return self.process(request)
+
+
+class CustomValueListView(CustomAPIView):
+    renderer_classes = [JSONRenderer]
+    distinct_query = True
+
+    def __init__(self, *args, **kwargs):
+        self.request_filter = {}
+        self.request_pagination = {}
+        self.request_order = []
+        self.request_data = {}
+
+        super().__init__(*args, **kwargs)
+
+    def handler(self, request, context):
+        objects = self.filter_queryset(
+            self.object_class.objects,
+            self.request_filter,
+        )
+        objects = objects.order_by(
+            *ApiHelpers.eval_expr("(%s)" % (", ".join(self.request_order)))
+        )
+
+        paginator = ApiPaginator(self.request_pagination)
+
+        result_set = paginator.paginate(
+            objects=objects,
+            request=request,
+            check_object_permission=self.check_object_permission,
+        )
+        paginator.update_context(context)
+
+        result_set = [
+            ApiHelpers.rgetattr(result, self.request_data.get("value"))
+            for result in result_set
+        ]
+
+        context.update(
+            {
+                "results": result_set,
+                "columns": [self.request_data.get("value")],
+            }
+        )
+
+        return request, context
+
+    def process(self, request):
+        context = ApiContext.list()
+
+        self.get_rest_request_content()
+        self.get_request_content_data()
+
+        self.request_filter = self.get_rest_content_filter()
+        self.request_pagination = self.get_rest_content_pagination()
+        self.request_order = self.get_rest_content_order()
+
+        request, context = self.handler(request, context)
+
+        self.add_user_to_context(context, request)
+
+        context.update(
+            {
+                "success": True,
+                "status": status.HTTP_200_OK,
             }
         )
 
@@ -300,13 +409,12 @@ class CustomGetView(CustomAPIView):
         super().__init__(*args, **kwargs)
 
     def handler(self, request, context):
+        obj = self.get_queryset(
+            self.object_class.objects,
+            self.request_filter,
+        )
 
-        if "id" not in self.request_data and "pk" not in self.request_data:
-            raise ApiContentDataPkNotProvided()
-
-        obj = self.object_class.objects.get(**self.request_data)
-
-        if not obj.check_view_perm(request):
+        if self.check_object_permission and not obj.check_view_perm(request):
             raise ApiPermissionError("Object permission denied.")
 
         context.update({"result": self.return_serializer_class(obj).data})
@@ -314,20 +422,21 @@ class CustomGetView(CustomAPIView):
         return request, context
 
     def process(self, request):
-        context = ApiContext.list()
+        context = ApiContext.get()
 
         self.get_rest_request_content()
+        self.request_filter = self.get_rest_content_filter()
+        self.get_rest_content_flags()
         self.get_request_content_data()
 
         request, context = self.handler(request, context)
 
+        if isinstance(context, HttpResponse):
+            return context
+
         self.add_user_to_context(context, request)
 
-        context.update(
-            {
-                "success": True,
-            }
-        )
+        context.update({"success": True})
 
         return Response(
             ApiHelpers.encrypt_context(context)
@@ -350,6 +459,9 @@ class CustomCreateView(CustomAPIView):
     def hook_after_creation(self, obj):
         pass
 
+    def hook_before_creation(self, tmp_obj):
+        pass
+
     def handler(self, request, context):
         serializer = self.serializer_class(
             data=self.request_data, context={"request": request}
@@ -363,12 +475,18 @@ class CustomCreateView(CustomAPIView):
         if not self.check_serializer_field_perm(serializer):
             raise ApiPermissionError()
 
-        created_object = serializer.save()
+        tmp_object = self.object_class(**serializer.validated_data)
+        self.hook_before_creation(tmp_object)
 
-        self.hook_after_creation(created_object)
+        if self.check_object_permission and not tmp_object.check_add_perm(request):
+            raise ApiPermissionError()
+
+        tmp_object.save()
+
+        self.hook_after_creation(tmp_object)
 
         context.update(
-            {"result": self.return_serializer_class(instance=created_object).data}
+            {"result": self.return_serializer_class(instance=tmp_object).data}
         )
 
         return request, context
@@ -377,6 +495,7 @@ class CustomCreateView(CustomAPIView):
         context = ApiContext.create()
 
         self.get_rest_request_content()
+        self.get_rest_content_flags()
         self.get_request_content_data()
 
         request, context = self.handler(request, context)
@@ -389,6 +508,7 @@ class CustomCreateView(CustomAPIView):
             ApiHelpers.encrypt_context(context)
             if self.request_content.get("encrypt") is True
             else context,
+            status=status.HTTP_201_CREATED,
         )
 
     def put(self, request):
@@ -400,7 +520,6 @@ class CustomCreateView(CustomAPIView):
 
 class CustomAddView(CustomCreateView):
     # Proxy class
-
     pass
 
 
@@ -411,6 +530,9 @@ class CustomUpdateView(CustomAPIView):
         self.request_data = {}
 
         super().__init__(*args, **kwargs)
+
+    def hook_before_update(self, obj):
+        pass
 
     def hook_after_update(self, obj):
         pass
@@ -433,6 +555,8 @@ class CustomUpdateView(CustomAPIView):
 
         if not object_to_update.check_change_perm(request):
             raise ApiPermissionError("Object permission denied.")
+
+        self.hook_before_update(object_to_update)
 
         serializer = self.serializer_class(
             instance=object_to_update, data=self.request_data, partial=True
@@ -458,6 +582,7 @@ class CustomUpdateView(CustomAPIView):
 
         self.get_rest_request_content()
         self.get_request_content_data()
+        self.get_rest_content_flags()
 
         request, context = self.handler(request, context)
 
@@ -477,7 +602,6 @@ class CustomUpdateView(CustomAPIView):
 
 class CustomChangeView(CustomUpdateView):
     # Proxy class
-
     pass
 
 
@@ -491,7 +615,12 @@ class CustomDeleteView(CustomAPIView):
 
     def handler(self, request, context):
 
-        if "id" not in self.request_data and "pk" not in self.request_data:
+        if (
+            "id" not in self.request_data
+            and "pk" not in self.request_data
+            and "id_set" not in self.request_data
+            and "pk_set" not in self.request_data
+        ):
             raise ApiContentDataPkNotProvided()
 
         pk = (
@@ -500,15 +629,34 @@ class CustomDeleteView(CustomAPIView):
             else self.request_data.get("pk")
         )
 
-        obj_to_delete = self.object_class.objects.get(pk=pk)
+        pk_set = (
+            self.request_data.get("id_set", [])
+            if self.request_data.get("id_set", [])
+            else self.request_data.get("pk_set", [])
+        )
 
-        if not obj_to_delete:
-            raise ApiObjectNotFound()
+        if len(pk_set) > 0:
+            for _pk in pk_set:
+                obj_to_delete = self.object_class.objects.get(pk=_pk)
 
-        if not obj_to_delete.check_delete_perm(request):
-            raise ApiPermissionError("Object permission denied.")
+                if not obj_to_delete:
+                    raise ApiObjectNotFound()
 
-        obj_to_delete.delete()
+                if not obj_to_delete.check_delete_perm(request):
+                    continue
+
+                obj_to_delete.delete()
+
+        elif pk:
+            obj_to_delete = self.object_class.objects.get(pk=pk)
+
+            if not obj_to_delete:
+                raise ApiObjectNotFound()
+
+            if not obj_to_delete.check_delete_perm(request):
+                raise ApiPermissionError("Object permission denied.")
+
+            obj_to_delete.delete()
 
         return request, context
 
@@ -517,6 +665,7 @@ class CustomDeleteView(CustomAPIView):
 
         self.get_rest_request_content()
         self.get_request_content_data()
+        self.get_rest_content_flags()
 
         request, context = self.handler(request, context)
 
@@ -616,6 +765,7 @@ class BasicPasswordAuth(CustomAPIView):
 
         self.get_rest_request_content()
         self.get_request_content_data()
+        self.get_rest_content_flags()
 
         if "username" not in self.request_data or "password" not in self.request_data:
             raise ApiAuthUsernameOrPasswordNotProvided()
@@ -695,6 +845,7 @@ class BasicTokenRefresh(CustomAPIView):
 
         self.get_rest_request_content()
         self.get_request_content_data()
+        self.get_rest_content_flags()
 
         request, context = self.handler(request, context)
 

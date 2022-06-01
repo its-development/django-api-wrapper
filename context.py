@@ -9,28 +9,28 @@ class ApiContext:
     @classmethod
     def list(cls):
         ctx = cls.default_context.copy()
-        ctx.update({"results": None})
+        ctx.update({"results": []})
 
         return ctx
 
     @classmethod
     def get(cls):
         ctx = cls.default_context.copy()
-        ctx.update({"result": None})
+        ctx.update({"result": {}, "flags": {}})
 
         return ctx
 
     @classmethod
     def create(cls):
         ctx = cls.default_context.copy()
-        ctx.update({"result": None})
+        ctx.update({"result": {}, "flags": {}})
 
         return ctx
 
     @classmethod
     def update(cls):
         ctx = cls.default_context.copy()
-        ctx.update({"result": None})
+        ctx.update({"result": {}, "flags": {}})
 
         return ctx
 

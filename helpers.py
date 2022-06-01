@@ -1,9 +1,8 @@
-from pprint import pprint
-
 import binascii
 import functools
 import json
 import os
+import re
 from datetime import timedelta
 
 from django.db.models import Q
@@ -29,6 +28,7 @@ def eval_(node):
         ast.USub: op.neg,
         ast.BitAnd: op.and_,
         ast.BitOr: op.or_,
+        ast.Invert: op.invert,
     }
 
     if isinstance(node, ast.Num):
@@ -39,7 +39,12 @@ def eval_(node):
         return operators[type(node.op)](eval_(node.operand))
     elif isinstance(node, ast.Call):
         if node.func.id == "Q":
-            return Q(**{node.keywords[0].arg: node.keywords[0].value.value})
+            if isinstance(node.keywords[0].value, ast.Constant):
+                return Q(**{node.keywords[0].arg: node.keywords[0].value.value})
+            elif isinstance(node.keywords[0].value, ast.Tuple):
+                return Q(**{node.keywords[0].arg: eval_(node.keywords[0].value)})
+            elif isinstance(node.keywords[0].value, ast.List):
+                return Q(**{node.keywords[0].arg: eval_(node.keywords[0].value)})
         elif node.func.id == "Lower":
             return Lower(node.args[0].value)
         elif node.func.id == "Upper":
@@ -50,6 +55,8 @@ def eval_(node):
         return node.value
     elif isinstance(node, ast.Tuple):
         return [eval_(elt) for elt in node.elts]
+    elif isinstance(node, ast.List):
+        return [eval_(elt) for elt in node.elts]
     else:
         raise ApiTypeError("eval_ does not support this node. Hi exploiter :)")
 
@@ -57,8 +64,6 @@ def eval_(node):
 class ApiHelpers:
     @staticmethod
     def parse_string(val, template_vars):
-        import re
-
         res = val
 
         matches = re.finditer(r"\[(.*?)\]", val)
@@ -71,6 +76,9 @@ class ApiHelpers:
 
     @staticmethod
     def eval_expr(expr):
+        if not expr:
+            return None
+
         return eval_(ast.parse(expr, mode="eval").body)
 
     @staticmethod
@@ -140,3 +148,10 @@ class ApiHelpers:
     @staticmethod
     def round_float(value, precision) -> str:
         return ("%." + str(precision) + "f") % (value,)
+
+    @staticmethod
+    def list_get(l, i, default):
+        try:
+            return l[i]
+        except IndexError:
+            return default

@@ -15,15 +15,16 @@ class ApiPaginator:
         limit = request_pagination.get("limit")
         page = request_pagination.get("page")
 
-        self.offset = int(offset) if offset else 0
         self.limit = int(limit) if limit else 25
-        self.page = int(page) if page else 0
 
         if self.limit is None:
-            raise ApiValueError("ApiPaginator did not got a limit.")
+            raise ApiValueError("ApiPaginator: limit not provided.")
 
-        if self.page is not None:
-            self.offset = self.page * self.limit
+        if page:
+            self.offset = int(page) * self.limit
+
+        else:
+            self.offset = int(offset) if offset else 0
 
     def paginate(
         self, objects=None, request=None, check_object_permission: bool = True
