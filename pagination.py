@@ -55,6 +55,7 @@ class ApiPaginator:
             if check_object_permission:
                 if not obj.check_view_perm(request):
                     self.limit += 1
+                    self.total -= 1
 
                 else:
                     result_set.append(obj)
