@@ -302,6 +302,7 @@ class CustomListView(CustomAPIView):
         self.get_rest_request_content()
         self.request_filter = self.get_rest_content_filter()
         self.request_pagination = self.get_rest_content_pagination()
+        self.get_rest_content_flags()
         self.request_order = self.get_rest_content_order()
 
         request, context = self.handler(request, context)
@@ -584,7 +585,10 @@ class CustomUpdateView(CustomAPIView):
         self.get_request_content_data()
         self.get_rest_content_flags()
 
-        request, context = self.handler(request, context)
+        try:
+            request, context = self.handler(request, context)
+        except Exception as e:
+            raise ApiValueError(e)
 
         self.add_user_to_context(context, request)
 
