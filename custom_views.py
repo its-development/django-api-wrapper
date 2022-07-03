@@ -588,7 +588,9 @@ class CustomUpdateView(CustomAPIView):
         try:
             request, context = self.handler(request, context)
         except Exception as e:
-            raise ApiValueError(e)
+            if not isinstance(e, APIException):
+                raise ApiValueError(e)
+            raise e
 
         self.add_user_to_context(context, request)
 
