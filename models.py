@@ -37,5 +37,10 @@ class ApiWrapperAbstractUser(AbstractUser):
         primary_key=True, default=uuid.uuid4, editable=False, unique=True
     )
 
+    email = models.EmailField(
+        blank=True,
+        unique=True,
+    )
+
     class Meta:
         abstract = True
