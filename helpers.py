@@ -64,13 +64,14 @@ def eval_(node):
 class ApiHelpers:
     @staticmethod
     def parse_string(val, template_vars):
+        # Template: [% var1 %]
         res = val
 
         matches = re.finditer(r"\[(.*?)\]", val)
 
         for match in matches:
             var = re.search("(?<=\[%).+?(?=\%])", match.group(0)).group(0)
-            res = res.replace(match.group(0), template_vars[var])
+            res = res.replace(match.group(0), str(template_vars[var]))
 
         return res
 
