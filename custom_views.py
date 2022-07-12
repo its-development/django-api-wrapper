@@ -26,6 +26,7 @@ class CustomAPIView(APIView):
     serializer_class = None
     enhanced_filters = False
     check_object_permission = True
+    session_data = {}
 
     def __init__(self, *args, **kwargs):
         self.request_content = {}
@@ -619,6 +620,12 @@ class CustomDeleteView(CustomAPIView):
 
         super().__init__(*args, **kwargs)
 
+    def hook_before_delete(self, obj):
+        pass
+
+    def hook_after_delete(self):
+        pass
+
     def handler(self, request, context):
 
         if (
@@ -651,7 +658,9 @@ class CustomDeleteView(CustomAPIView):
                 if not obj_to_delete.check_delete_perm(request):
                     continue
 
+                self.hook_before_delete(obj_to_delete)
                 obj_to_delete.delete()
+                self.hook_after_delete()
 
         elif pk:
             obj_to_delete = self.object_class.objects.get(pk=pk)
@@ -662,7 +671,9 @@ class CustomDeleteView(CustomAPIView):
             if not obj_to_delete.check_delete_perm(request):
                 raise ApiPermissionError("Object permission denied.")
 
+            self.hook_before_delete(obj_to_delete)
             obj_to_delete.delete()
+            self.hook_after_delete()
 
         return request, context
 
