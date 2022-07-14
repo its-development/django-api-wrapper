@@ -45,6 +45,14 @@ def eval_(node):
                 return Q(**{node.keywords[0].arg: eval_(node.keywords[0].value)})
             elif isinstance(node.keywords[0].value, ast.List):
                 return Q(**{node.keywords[0].arg: eval_(node.keywords[0].value)})
+            elif isinstance(node.keywords[0].value, ast.BinOp):
+                return Q(**{node.keywords[0].arg: eval_(node.keywords[0].value)})
+            elif isinstance(node.keywords[0].value, ast.UnaryOp):
+                return Q(**{node.keywords[0].arg: eval_(node.keywords[0].value)})
+            else:
+                raise ApiValueError(
+                    "eval_ does not support this function. Hi exploiter :)"
+                )
         elif node.func.id == "Lower":
             return Lower(node.args[0].value)
         elif node.func.id == "Upper":
