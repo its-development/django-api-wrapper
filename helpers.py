@@ -67,7 +67,7 @@ class ApiHelpers:
         # Template: [% var1 %]
         res = val
 
-        matches = re.finditer(r"\[(.*?)\]", val)
+        matches = re.finditer(r"\[(.*?)\]", str(val))
 
         for match in matches:
             var = re.search("(?<=\[%).+?(?=\%])", match.group(0)).group(0)
