@@ -13,7 +13,10 @@ class ApiWrapperQuerySet(models.QuerySet):
     def get(self, *args, **kwargs):
         # TODO: Find better solution here, annotate before get is not possible
         res = self.__class__.property_annotate(super()).filter(*args, **kwargs)
-        raise self.model.DoesNotExist() if not res else self.model.MultipleObjectsReturned()
+        if len(res) < 1:
+            raise self.model.DoesNotExist()
+        elif len(res) > 1:
+            raise self.model.MultipleObjectsReturned()
         return res[0]
 
     def get_queryset(self):
