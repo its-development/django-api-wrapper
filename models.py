@@ -5,6 +5,21 @@ from django.db import models
 from .manager import ApiWrapperModelManager
 
 
+class ApiWrapperQuerySet(models.QuerySet):
+    @classmethod
+    def property_annotate(cls, queryset):
+        return queryset
+
+    def get(self, *args, **kwargs):
+        # TODO: Find better solution here, annotate before get is not possible
+        res = self.__class__.property_annotate(super()).filter(*args, **kwargs)
+        raise self.model.DoesNotExist() if not res else self.model.MultipleObjectsReturned()
+        return res[0]
+
+    def get_queryset(self):
+        return self.__class__.property_annotate(super().get_queryset())
+
+
 class ApiWrapperModel(models.Model):
     objects = ApiWrapperModelManager
 
