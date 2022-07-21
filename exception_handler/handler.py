@@ -21,12 +21,12 @@ def custom_exception_handler(exc, context):
         if response.data is not None:
 
             if "detail" in response.data:
+                details = response.data.pop("detail")
                 messages.append(
                     {
                         "type": response.status_code,
-                        "message": response.data.pop("detail")
-                        if ApiSettings.DEBUG
-                        else "",
+                        "message": details,
+                        "code": details.code,
                     }
                 )
 
