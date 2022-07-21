@@ -15,7 +15,12 @@ class ExpiringTokenAuthentication(TokenAuthentication):
     keyword = "token"
 
     def authenticate(self, request):
-        user, token = super().authenticate(request)
+        res = super().authenticate(request)
+
+        if not res:
+            raise ApiAuthFailed()
+
+        user, token = res
 
         if not token:
             raise ApiAuthFailed()
