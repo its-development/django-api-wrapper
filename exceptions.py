@@ -97,7 +97,7 @@ class ApiContentDataPkNotProvided(APIException):
 
 
 class ApiObjectNotFound(APIException):
-    status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+    status_code = status.HTTP_404_NOT_FOUND
     default_detail = "ApiObjectNotFound"
     default_code = "api_object_not_found"
 

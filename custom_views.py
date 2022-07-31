@@ -1,3 +1,4 @@
+import traceback
 from pprint import pprint
 
 from django.http import HttpResponse
@@ -7,6 +8,7 @@ from rest_framework.renderers import JSONRenderer
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
+from traceback import print_exc
 
 from .models import ApiWrapperModel, ApiWrapperAbstractUser
 from .settings import ApiSettings
@@ -53,6 +55,13 @@ class CustomAPIView(APIView):
             return
 
         ctx.update({"user": self.user_serializer(instance=request.user).data})
+
+    def pre_handle_exception(self, e):
+        if ApiSettings.DEBUG:
+            traceback.print_exc()
+        if not isinstance(e, APIException):
+            raise ApiError(e)
+        raise e
 
     def hook_request_data(self, data):
         return data
@@ -224,9 +233,15 @@ class CustomAPIView(APIView):
     def get_queryset(self, manager, fil=None):
         if fil:
             if isinstance(fil, dict):
-                obj = manager.get(**fil)
+                try:
+                    obj = manager.get(**fil)
+                except manager.model.DoesNotExist:
+                    raise ApiObjectNotFound()
             elif isinstance(fil, Q):
-                obj = manager.get(fil)
+                try:
+                    obj = manager.get(fil)
+                except manager.model.DoesNotExist:
+                    raise ApiObjectNotFound()
             else:
                 if ApiSettings.DEBUG:
                     print(type(fil))
@@ -431,7 +446,10 @@ class CustomGetView(CustomAPIView):
         self.get_rest_content_flags()
         self.get_request_content_data()
 
-        request, context = self.handler(request, context)
+        try:
+            request, context = self.handler(request, context)
+        except Exception as e:
+            self.pre_handle_exception(e)
 
         if isinstance(context, HttpResponse):
             return context
@@ -589,9 +607,7 @@ class CustomUpdateView(CustomAPIView):
         try:
             request, context = self.handler(request, context)
         except Exception as e:
-            if not isinstance(e, APIException):
-                raise ApiValueError(e)
-            raise e
+            self.pre_handle_exception(e)
 
         self.add_user_to_context(context, request)
 
