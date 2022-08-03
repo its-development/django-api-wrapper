@@ -2,11 +2,11 @@ import uuid
 
 from django.contrib.auth.models import AbstractUser
 from django.db import models
-from .manager import ApiWrapperModelManager
+from .manager import ApiWrapperModelManager, ApiWrapperUserManager
 
 
 class ApiWrapperModel(models.Model):
-    objects = ApiWrapperModelManager
+    objects = ApiWrapperModelManager()
 
     id = models.UUIDField(
         primary_key=True, default=uuid.uuid4, editable=False, unique=True
@@ -34,6 +34,7 @@ class ApiWrapperModel(models.Model):
 
 
 class ApiWrapperAbstractUser(AbstractUser):
+    objects = ApiWrapperUserManager()
     id = models.UUIDField(
         primary_key=True, default=uuid.uuid4, editable=False, unique=True
     )
