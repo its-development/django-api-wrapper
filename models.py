@@ -14,6 +14,7 @@ class ApiWrapperModel(models.Model):
     is_active = models.BooleanField(default=True)
 
     class Meta:
+        base_manager_name = "objects"
         abstract = True
 
     def check_obj_perm(self, request):
@@ -43,4 +44,5 @@ class ApiWrapperAbstractUser(AbstractUser):
     )
 
     class Meta:
+        base_manager_name = "objects"
         abstract = True
