@@ -6,6 +6,10 @@ class ApiValueError(APIException):
     status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
 
 
+class ApiValueConflictError(APIException):
+    status_code = status.HTTP_409_CONFLICT
+
+
 class ApiPermissionError(APIException):
     status_code = status.HTTP_403_FORBIDDEN
 
