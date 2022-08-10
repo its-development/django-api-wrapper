@@ -857,11 +857,11 @@ class BasicTokenRefresh(CustomAPIView):
         try:
             token = self.model.objects.get(refresh_token=refresh_token)
         except self.model.DoesNotExist:
-            raise ApiValueError("refresh_token_does_not_exist")
+            raise ApiExpiringRefreshTokenNotFound()
 
         if token.is_refresh_token_expired:
             token.delete()
-            raise ApiValueError("refresh_token expired")
+            raise ApiExpiringRefreshTokenIsExpired()
 
         if token.is_access_token_expired:
             if token.updated_at + timezone.timedelta(seconds=10) < timezone.now():

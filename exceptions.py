@@ -46,10 +46,22 @@ class ApiExpiringTokenNotFound(APIException):
     default_code = "api_expiring_token_not_found"
 
 
+class ApiExpiringRefreshTokenNotFound(APIException):
+    status_code = status.HTTP_401_UNAUTHORIZED
+    default_detail = "ApiExpiringRefreshTokenNotFound"
+    default_code = "api_expiring_refresh_token_not_found"
+
+
 class ApiExpiringTokenIsExpired(APIException):
     status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
     default_detail = "ApiExpiringTokenIsExpired"
     default_code = "api_expiring_token_is_expired"
+
+
+class ApiExpiringRefreshTokenIsExpired(APIException):
+    status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+    default_detail = "ApiExpiringRefreshTokenIsExpired"
+    default_code = "api_expiring_refresh_token_is_expired"
 
 
 class ApiSerializerInvalid(APIException):
