@@ -28,6 +28,7 @@ class CustomAPIView(APIView):
     serializer_class = None
     enhanced_filters = False
     check_object_permission = True
+    check_serializer_permission = True
     session_data = {}
 
     def __init__(self, *args, **kwargs):
@@ -492,7 +493,7 @@ class CustomCreateView(CustomAPIView):
                 print(serializer.errors)
             raise ApiSerializerInvalid()
 
-        if not self.check_serializer_field_perm(serializer):
+        if self.check_serializer_permission and not self.check_serializer_field_perm(serializer):
             raise ApiPermissionError()
 
         tmp_object = self.object_class(**serializer.validated_data)
