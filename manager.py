@@ -9,6 +9,9 @@ class ApiWrapperModelManager(models.Manager):
     def get_queryset(self):
         return self.property_annotate(super().get_queryset())
 
+    def get_safe(self, *args, **kwargs):
+        return self.get_queryset().filter(*args, **kwargs).first()
+
 
 class ApiWrapperUserManager(UserManager):
     def property_annotate(self, queryset):
@@ -16,3 +19,6 @@ class ApiWrapperUserManager(UserManager):
 
     def get_queryset(self):
         return self.property_annotate(super().get_queryset())
+
+    def get_safe(self, *args, **kwargs):
+        return self.get_queryset().filter(*args, **kwargs).first()
