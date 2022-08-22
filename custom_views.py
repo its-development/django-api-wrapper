@@ -290,7 +290,7 @@ class CustomListView(CustomAPIView):
             *ApiHelpers.eval_expr("(%s)" % (", ".join(self.request_order)))
         )
 
-        paginator = ApiPaginator(self.request_pagination)
+        paginator = ApiPaginator(self.request_pagination, distinct=self.distinct_query)
 
         result_set = paginator.paginate(
             objects=objects,
@@ -493,7 +493,9 @@ class CustomCreateView(CustomAPIView):
                 print(serializer.errors)
             raise ApiSerializerInvalid()
 
-        if self.check_serializer_permission and not self.check_serializer_field_perm(serializer):
+        if self.check_serializer_permission and not self.check_serializer_field_perm(
+            serializer
+        ):
             raise ApiPermissionError()
 
         tmp_object = self.object_class(**serializer.validated_data)

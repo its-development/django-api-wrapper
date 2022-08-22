@@ -1,4 +1,7 @@
+from django.db.models import QuerySet
+
 from api.exceptions import *
+from api.helpers import ApiHelpers
 
 
 class ApiPaginator:
@@ -6,8 +9,10 @@ class ApiPaginator:
     limit: int = 0
     page: int = 0
     total: int = 0
+    distinct: bool = False
 
-    def __init__(self, request_pagination: dict):
+    def __init__(self, request_pagination: dict, distinct: bool = False):
+        self.distinct = distinct
         self.get_pagination_data(request_pagination)
 
     def get_pagination_data(self, request_pagination: dict = {}):
@@ -26,24 +31,34 @@ class ApiPaginator:
         else:
             self.offset = int(offset) if offset else 0
 
-    def paginate(
-        self, objects=None, request=None, check_object_permission: bool = True
-    ):
-        result_set = []
-
-        if not request:
-            raise ApiPaginationError("Insufficient data provided.")
-
-        if isinstance(objects, list):
+    def setup(self, objects):
+        if isinstance(objects, QuerySet):
+            result_set = set() if self.distinct else list()
+            self.total = objects.count()
+        elif isinstance(objects, (list, set)):
+            result_set = type(objects)() if not self.distinct else set()
             self.total = len(objects)
         else:
-            self.total = objects.count()
+            raise ApiValueError()
+
+        if self.distinct:
+            result_set = set()
+
+        return result_set
+
+    def paginate(
+        self,
+        objects: list | set | QuerySet,
+        request,
+        check_object_permission: bool = True,
+    ):
+        result_set = self.setup(objects)
 
         if self.total == 0:
-            return []
+            return result_set
 
         if self.offset >= self.total:
-            raise ApiValueError("Offset bigger total count.")
+            raise ApiValueError("ApiPaginator: offset out of range.")
 
         if self.limit == -1:
             self.limit = self.total
@@ -56,12 +71,25 @@ class ApiPaginator:
                 if not obj.check_view_perm(request):
                     self.limit += 1
                     self.total -= 1
-
+                    continue
                 else:
-                    result_set.append(obj)
-
+                    if isinstance(result_set, list):
+                        result_set.append(obj)
+                    elif isinstance(result_set, set):
+                        added = ApiHelpers.add_set(result_set, obj)
+                        if not added:
+                            self.limit += 1
+                            self.total -= 1
+                            continue
             else:
-                result_set.append(obj)
+                if isinstance(result_set, list):
+                    result_set.append(obj)
+                elif isinstance(result_set, set):
+                    added = ApiHelpers.add_set(result_set, obj)
+                    if not added:
+                        self.limit += 1
+                        self.total -= 1
+                        continue
 
         return result_set
 

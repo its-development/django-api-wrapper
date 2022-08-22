@@ -190,3 +190,9 @@ class ApiHelpers:
                 perm.save()
 
                 print(perm.codename)
+
+    @staticmethod
+    def add_set(target, item):
+        l = len(target)
+        target.add(item)
+        return l != len(target)
