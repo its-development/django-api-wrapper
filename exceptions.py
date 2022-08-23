@@ -10,6 +10,11 @@ class ApiValueConflictError(APIException):
     status_code = status.HTTP_409_CONFLICT
 
 
+class ApiDeleteProtectedError(APIException):
+    status_code = status.HTTP_409_CONFLICT
+    default_code = "api_delete_protected_error"
+
+
 class ApiPermissionError(APIException):
     status_code = status.HTTP_403_FORBIDDEN
 

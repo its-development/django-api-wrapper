@@ -1,14 +1,12 @@
 import traceback
-from pprint import pprint
 
+import django
 from django.http import HttpResponse
 from django.db.models import Q
 
 from rest_framework.renderers import JSONRenderer
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework import status
-from traceback import print_exc
 
 from .models import ApiWrapperModel, ApiWrapperAbstractUser
 from .settings import ApiSettings
@@ -261,7 +259,11 @@ class CustomAPIView(APIView):
 
     def process(self, request):
         context = ApiContext.default()
-        request, context = self.handler(request, context)
+
+        try:
+            request, context = self.handler(request, context)
+        except Exception as e:
+            self.pre_handle_exception(e)
 
         return Response(
             ApiHelpers.encrypt_context(context)
@@ -322,7 +324,10 @@ class CustomListView(CustomAPIView):
         self.get_rest_content_flags()
         self.request_order = self.get_rest_content_order()
 
-        request, context = self.handler(request, context)
+        try:
+            request, context = self.handler(request, context)
+        except Exception as e:
+            self.pre_handle_exception(e)
 
         self.add_user_to_context(context, request)
 
@@ -397,7 +402,10 @@ class CustomValueListView(CustomAPIView):
         self.request_pagination = self.get_rest_content_pagination()
         self.request_order = self.get_rest_content_order()
 
-        request, context = self.handler(request, context)
+        try:
+            request, context = self.handler(request, context)
+        except Exception as e:
+            self.pre_handle_exception(e)
 
         self.add_user_to_context(context, request)
 
@@ -521,7 +529,10 @@ class CustomCreateView(CustomAPIView):
         self.get_rest_content_flags()
         self.get_request_content_data()
 
-        request, context = self.handler(request, context)
+        try:
+            request, context = self.handler(request, context)
+        except Exception as e:
+            self.pre_handle_exception(e)
 
         self.add_user_to_context(context, request)
 
@@ -703,7 +714,12 @@ class CustomDeleteView(CustomAPIView):
         self.get_request_content_data()
         self.get_rest_content_flags()
 
-        request, context = self.handler(request, context)
+        try:
+            request, context = self.handler(request, context)
+        except django.db.models.deletion.ProtectedError as e:
+            raise ApiDeleteProtectedError()
+        except Exception as e:
+            self.pre_handle_exception(e)
 
         self.add_user_to_context(context, request)
 
