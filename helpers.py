@@ -167,22 +167,21 @@ class ApiHelpers:
 
     @staticmethod
     def generate_model_field_permissions(permission, content_type, model):
-        for action in ["add", "change", "view", "delete"]:
+        for action in ["add", "change", "view"]:
             for field in model._meta.get_fields():
                 perm, _ = permission.objects.get_or_create(
                     content_type=content_type.objects.get(
                         app_label=model._meta.app_label,
                         model=model._meta.model_name,
                     ),
-                    codename="%s_%s_%s_not_%s"
+                    codename="%s_%s_%s"
                     % (
-                        model._meta.app_label,
+                        action,
                         model._meta.model_name,
                         field.name,
-                        action,
                     ),
                 )
-                perm.name = "Can not %s %s.%s" % (
+                perm.name = "Can %s %s.%s" % (
                     action,
                     model._meta.model_name,
                     field.name,
