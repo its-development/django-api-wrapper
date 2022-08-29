@@ -63,7 +63,6 @@ class CustomAPIView(APIView):
 
     def get_rest_request_content(self):
         """
-
         :param request:
         :return request.data:
         """
@@ -880,10 +879,18 @@ class BasicPasswordAuth(CustomAPIView):
                 "status": 200,
                 "results": {
                     "user": self.serializer_class(
-                        instance=user, context={"request": self.request}
+                        instance=user,
+                        context={
+                            "request": self.request,
+                            "check_field_permission": self.check_serializer_field_permission,
+                        },
                     ).data,
                     "token": self.model_serializer(
-                        instance=token, context={"request": self.request}
+                        instance=token,
+                        context={
+                            "request": self.request,
+                            "check_field_permission": self.check_serializer_field_permission,
+                        },
                     ).data,
                 },
             }
