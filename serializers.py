@@ -38,7 +38,6 @@ class ApiWrapperModelSerializer(serializers.ModelSerializer):
             if not real_field_name:
                 continue
 
-            # TODO: Here we need to get the action performed (Serializer context?)
             if not current_user.has_perm(
                 "%s.view_%s_%s"
                 % (
@@ -54,7 +53,6 @@ class ApiWrapperModelSerializer(serializers.ModelSerializer):
     def run_validators(self, value):
         """
         Checking object permission on related fields.
-        TODO: Discuss what perm is needed for related fields.
         """
         for field_name, field_value in value.items():
             if isinstance(field_value, (ApiWrapperModel, models.Model)):
