@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from api.exceptions import ApiPermissionError
+from api.exceptions import ApiPermissionError, ApiSerializerActionNotProvidedError
 from api.helpers import ApiHelpers
 from api.models import ApiWrapperModel
 from api.settings import ApiSettings
@@ -13,24 +13,22 @@ class ApiWrapperModelSerializer(serializers.ModelSerializer):
     def get__model__(self, obj):
         return self.Meta.model.__name__
 
-    def to_representation(self, request_data):
-        ret = super(ApiWrapperModelSerializer, self).to_representation(request_data)
-        if not self.context.get("check_field_permission", False):
-            return ret
+    @classmethod
+    def get_accessible_fields(cls, request):
+        res = cls.Meta.fields
 
-        request = self.context.get("request")
         if not request:
-            if ApiSettings.get("DEBUG"):
-                print("ApiWrapperModelSerializer: No request found in context")
-            return ret
+            if ApiSettings.DEBUG:
+                print("ApiWrapperModelSerializer: No request provided.")
+            return res
 
         current_user = request.user
         if not current_user:
-            if ApiSettings.get("DEBUG"):
+            if ApiSettings.DEBUG:
                 print("ApiWrapperModelSerializer: No user found in request")
-            return ret
+            return res
 
-        for field_name, field_value in sorted(ret.items()):
+        for i, field_name in enumerate(res):
             real_field_name = field_name
             if "__" in field_name:
                 real_field_name = ApiHelpers.list_get(field_name.split("__"), 0, None)
@@ -41,11 +39,26 @@ class ApiWrapperModelSerializer(serializers.ModelSerializer):
             if not current_user.has_perm(
                 "%s.view_%s_%s"
                 % (
-                    self.Meta.model._meta.app_label,
-                    self.Meta.model._meta.model_name,
+                    cls.Meta.model._meta.app_label,
+                    cls.Meta.model._meta.model_name,
                     real_field_name,
                 )
             ):
+                res.pop(i)
+
+        return res
+
+    def to_representation(self, request_data):
+        ret = super(ApiWrapperModelSerializer, self).to_representation(request_data)
+        if not self.context.get("check_field_permission", False):
+            return ret
+
+        accessible_fields = self.__class__.get_accessible_fields(
+            self.context.get("request")
+        )
+
+        for field_name, field_value in sorted(ret.items()):
+            if field_name not in accessible_fields:
                 ret.pop(field_name)
 
         return ret

@@ -9,6 +9,7 @@ from rest_framework.renderers import JSONRenderer
 from rest_framework.views import APIView
 from rest_framework.response import Response
 
+from .serializers import ApiWrapperModelSerializer
 from .settings import ApiSettings
 from .helpers import ApiHelpers
 from .pagination import ApiPaginator
@@ -282,13 +283,16 @@ class CustomListView(CustomAPIView):
             context={
                 "request": self.request,
                 "check_field_permission": self.check_serializer_field_permission,
+                "action": "view",
             },
         ).data
 
         context.update(
             {
                 "results": result_set,
-                "columns": [*self.return_serializer_class.Meta.fields],
+                "columns": self.return_serializer_class.get_accessible_fields(request)
+                if isinstance(self.return_serializer_class, ApiWrapperModelSerializer)
+                else [*self.return_serializer_class.Meta.fields],
             }
         )
 
@@ -459,6 +463,7 @@ class CustomGetView(CustomAPIView):
                     context={
                         "request": self.request,
                         "check_field_permission": self.check_serializer_field_permission,
+                        "action": "view",
                     },
                 ).data
             }
@@ -516,6 +521,7 @@ class CustomCreateView(CustomAPIView):
             context={
                 "request": request,
                 "check_field_permission": self.check_serializer_field_permission,
+                "action": "add",
             },
         )
 
@@ -541,6 +547,7 @@ class CustomCreateView(CustomAPIView):
                     context={
                         "request": self.request,
                         "check_field_permission": self.check_serializer_field_permission,
+                        "action": "view",
                     },
                 ).data
             }
@@ -622,7 +629,11 @@ class CustomUpdateView(CustomAPIView):
             instance=object_to_update,
             data=self.request_data,
             partial=True,
-            context={"request": self.request},
+            context={
+                "request": self.request,
+                "check_field_permission": self.check_serializer_field_permission,
+                "action": "change",
+            },
         )
 
         if not serializer.is_valid():
@@ -641,6 +652,7 @@ class CustomUpdateView(CustomAPIView):
                     context={
                         "request": self.request,
                         "check_field_permission": self.check_serializer_field_permission,
+                        "action": "view",
                     },
                 ).data
             }
@@ -883,6 +895,7 @@ class BasicPasswordAuth(CustomAPIView):
                         context={
                             "request": self.request,
                             "check_field_permission": self.check_serializer_field_permission,
+                            "action": "view",
                         },
                     ).data,
                     "token": self.model_serializer(
@@ -890,6 +903,7 @@ class BasicPasswordAuth(CustomAPIView):
                         context={
                             "request": self.request,
                             "check_field_permission": self.check_serializer_field_permission,
+                            "action": "view",
                         },
                     ).data,
                 },
@@ -936,7 +950,18 @@ class BasicTokenRefresh(CustomAPIView):
                 token.regenerate()
 
         context.update(
-            {"result": {"token": self.model_serializer(instance=token).data}}
+            {
+                "result": {
+                    "token": self.model_serializer(
+                        instance=token,
+                        context={
+                            "request": self.request,
+                            "check_field_permission": self.check_serializer_field_permission,
+                            "action": "view",
+                        },
+                    ).data
+                }
+            }
         )
 
         return request, context

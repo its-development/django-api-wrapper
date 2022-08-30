@@ -15,6 +15,11 @@ class ApiDeleteProtectedError(APIException):
     default_code = "api_delete_protected_error"
 
 
+class ApiSerializerActionNotProvidedError(APIException):
+    status_code = status.HTTP_409_CONFLICT
+    default_code = "api_serializer_action_not_provided_error"
+
+
 class ApiPermissionError(APIException):
     status_code = status.HTTP_403_FORBIDDEN
 
