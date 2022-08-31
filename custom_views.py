@@ -69,23 +69,26 @@ class CustomAPIView(APIView):
         """
         content = {}
 
-        if self.request:
-            if self.request.method == "GET":
-                content = self.request.GET
+        if not self.request:
+            raise ApiEmptyRequestError()
 
-            elif self.request.method == "PUT":
-                content = self.request.data
+        if self.request.method == "GET":
+            self.request_content = self.request.GET
 
-            elif self.request.method == "DELETE":
-                content = self.request.data
+        elif self.request.method == "PUT":
+            self.request_content = self.request.data
 
-            elif self.request.method == "POST":
-                content = self.request.data
+        elif self.request.method == "DELETE":
+            self.request_content = self.request.data
 
-            elif self.request.method == "PATCH":
-                content = self.request.data
+        elif self.request.method == "POST":
+            self.request_content = self.request.data
 
-        self.request_content = content
+        elif self.request.method == "PATCH":
+            self.request_content = self.request.data
+
+        else:
+            raise ApiMethodNotSupportedError()
 
     def get_request_content_data(self):
         """
@@ -290,9 +293,6 @@ class CustomListView(CustomAPIView):
         context.update(
             {
                 "results": result_set,
-                "columns": self.return_serializer_class.get_accessible_fields(request)
-                if issubclass(self.return_serializer_class, ApiWrapperModelSerializer)
-                else [*self.return_serializer_class.Meta.fields],
             }
         )
 
@@ -318,6 +318,11 @@ class CustomListView(CustomAPIView):
             {
                 "success": True,
                 "status": status.HTTP_200_OK,
+                "columns": self.return_serializer_class.get_accessible_fields(
+                    request, self.check_serializer_field_permission
+                )
+                if issubclass(self.return_serializer_class, ApiWrapperModelSerializer)
+                else [*self.return_serializer_class.Meta.fields],
             }
         )
 
@@ -374,7 +379,6 @@ class CustomValueListView(CustomAPIView):
         context.update(
             {
                 "results": result_set,
-                "columns": [self.request_data.get("value")],
             }
         )
 
@@ -401,6 +405,7 @@ class CustomValueListView(CustomAPIView):
             {
                 "success": True,
                 "status": status.HTTP_200_OK,
+                "columns": [self.request_data.get("value")],
             }
         )
 
