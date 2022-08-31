@@ -291,7 +291,7 @@ class CustomListView(CustomAPIView):
             {
                 "results": result_set,
                 "columns": self.return_serializer_class.get_accessible_fields(request)
-                if isinstance(self.return_serializer_class, ApiWrapperModelSerializer)
+                if issubclass(self.return_serializer_class, ApiWrapperModelSerializer)
                 else [*self.return_serializer_class.Meta.fields],
             }
         )
