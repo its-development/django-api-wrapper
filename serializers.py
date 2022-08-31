@@ -15,7 +15,7 @@ class ApiWrapperModelSerializer(serializers.ModelSerializer):
 
     @classmethod
     def get_accessible_fields(cls, request):
-        res = cls.Meta.fields
+        res = [*cls.Meta.fields]
 
         if not request:
             if ApiSettings.DEBUG:
