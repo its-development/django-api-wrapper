@@ -314,15 +314,23 @@ class CustomListView(CustomAPIView):
 
         self.add_user_to_context(context, request)
 
+        if self.return_serializer_class:
+            context.update(
+                {
+                    "columns": self.return_serializer_class.get_accessible_fields(
+                        request, self.check_serializer_field_permission
+                    )
+                    if issubclass(
+                        self.return_serializer_class, ApiWrapperModelSerializer
+                    )
+                    else [*self.return_serializer_class.Meta.fields],
+                }
+            )
+
         context.update(
             {
                 "success": True,
                 "status": status.HTTP_200_OK,
-                "columns": self.return_serializer_class.get_accessible_fields(
-                    request, self.check_serializer_field_permission
-                )
-                if issubclass(self.return_serializer_class, ApiWrapperModelSerializer)
-                else [*self.return_serializer_class.Meta.fields],
             }
         )
 
