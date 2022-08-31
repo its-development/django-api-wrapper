@@ -14,8 +14,11 @@ class ApiWrapperModelSerializer(serializers.ModelSerializer):
         return self.Meta.model.__name__
 
     @classmethod
-    def get_accessible_fields(cls, request):
+    def get_accessible_fields(cls, request, check_field_permission=False):
         res = [*cls.Meta.fields]
+
+        if not check_field_permission:
+            return res
 
         if not request:
             if ApiSettings.DEBUG:
@@ -28,6 +31,8 @@ class ApiWrapperModelSerializer(serializers.ModelSerializer):
                 print("ApiWrapperModelSerializer: No user found in request")
             return res
 
+        accessible_fields = []
+
         for i, field_name in enumerate(res):
             real_field_name = field_name
             if "__" in field_name:
@@ -36,7 +41,7 @@ class ApiWrapperModelSerializer(serializers.ModelSerializer):
             if not real_field_name:
                 continue
 
-            if not current_user.has_perm(
+            if current_user.has_perm(
                 "%s.view_%s_%s"
                 % (
                     cls.Meta.model._meta.app_label,
@@ -44,9 +49,9 @@ class ApiWrapperModelSerializer(serializers.ModelSerializer):
                     real_field_name,
                 )
             ):
-                res.pop(i)
+                accessible_fields.append(field_name)
 
-        return res
+        return accessible_fields
 
     def to_representation(self, request_data):
         ret = super(ApiWrapperModelSerializer, self).to_representation(request_data)
@@ -54,7 +59,8 @@ class ApiWrapperModelSerializer(serializers.ModelSerializer):
             return ret
 
         accessible_fields = self.__class__.get_accessible_fields(
-            self.context.get("request")
+            self.context.get("request"),
+            self.context.get("check_field_permission", False),
         )
 
         for field_name, field_value in sorted(ret.items()):
