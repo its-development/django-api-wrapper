@@ -35,6 +35,12 @@ class ApiWrapperModelSerializer(serializers.ModelSerializer):
 
         for i, field_name in enumerate(res):
             real_field_name = field_name
+
+            # TODO: SECURITY_NOTE: Private fields are always accessible.
+            if field_name.startswith("__"):
+                accessible_fields.append(field_name)
+                continue
+
             if "__" in field_name:
                 real_field_name = ApiHelpers.list_get(field_name.split("__"), 0, None)
 
