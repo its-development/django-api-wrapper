@@ -666,7 +666,7 @@ class CustomUpdateView(CustomAPIView):
         if not object_to_update:
             raise ApiObjectNotFound()
 
-        if not object_to_update.check_change_perm(request):
+        if self.check_object_permission and not object_to_update.check_change_perm(request):
             raise ApiPermissionError("Object permission denied.")
 
         self.hook_before_update(object_to_update)
