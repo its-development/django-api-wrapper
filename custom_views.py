@@ -464,7 +464,7 @@ class CustomGetView(CustomAPIView):
 
         if self.check_object_permission and not obj.check_view_perm(request):
             err_msg = "%s: You don't have permission to view this object" % (
-                obj.__class
+                obj.__class__.__name__
             )
             raise ApiPermissionError(err_msg)
 
