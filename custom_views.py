@@ -227,6 +227,9 @@ class CustomAPIView(APIView):
     def get_queryset(self):
         raise NotImplementedError()
 
+    def annotate_queryset(self, objects):
+        return objects
+
     def handler(self, request, context):
         raise NotImplementedError()
 
@@ -268,7 +271,7 @@ class CustomListView(CustomAPIView):
         return objects
 
     def handler(self, request, context):
-        objects = self.get_queryset()
+        objects = self.annotate_queryset(self.get_queryset())
 
         paginator = ApiPaginator(self.request_pagination, distinct=self.distinct_query)
 
@@ -666,7 +669,9 @@ class CustomUpdateView(CustomAPIView):
         if not object_to_update:
             raise ApiObjectNotFound()
 
-        if self.check_object_permission and not object_to_update.check_change_perm(request):
+        if self.check_object_permission and not object_to_update.check_change_perm(
+            request
+        ):
             raise ApiPermissionError("Object permission denied.")
 
         self.hook_before_update(object_to_update)
