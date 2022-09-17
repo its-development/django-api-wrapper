@@ -929,6 +929,9 @@ class BasicPasswordAuth(CustomAPIView):
     def _auth_method(self, username, password):
         raise NotImplemented()
 
+    def hook_context(self, context):
+        pass
+
     def process(self, request):
         context = ApiContext.auth()
 
@@ -948,6 +951,8 @@ class BasicPasswordAuth(CustomAPIView):
 
         if not user:
             raise ApiAuthFailed()
+
+        self.request.user = user
 
         token = self.model.objects.create(
             user=user, ip_addr=user_ip, user_agent=user_user_agent
@@ -978,6 +983,8 @@ class BasicPasswordAuth(CustomAPIView):
             }
         )
 
+        self.hook_context(context)
+
         return Response(
             context,
         )
@@ -995,6 +1002,9 @@ class BasicTokenRefresh(CustomAPIView):
 
     def _auth_method(self, username, password):
         raise NotImplemented()
+
+    def hook_context(self, context):
+        pass
 
     def handler(self, request, context):
         from django.utils import timezone
@@ -1031,6 +1041,8 @@ class BasicTokenRefresh(CustomAPIView):
                 }
             }
         )
+
+        self.hook_context(context)
 
         return request, context
 
