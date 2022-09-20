@@ -19,6 +19,8 @@ from .exceptions import *
 import csv
 import re
 
+from .throttles import BasicPasswordAuthThrottle, BasicTokenRefreshThrottle
+
 
 class CustomAPIView(APIView):
     object_class = None
@@ -922,6 +924,7 @@ class CustomExportView(CustomAPIView):
 class BasicPasswordAuth(CustomAPIView):
     authentication_classes = []
     permission_classes = []
+    throttle_classes = [BasicPasswordAuthThrottle]
 
     model = None
     model_serializer = None
@@ -996,6 +999,7 @@ class BasicPasswordAuth(CustomAPIView):
 class BasicTokenRefresh(CustomAPIView):
     authentication_classes = []
     permission_classes = []
+    throttle_classes = [BasicTokenRefreshThrottle]
 
     model = None
     model_serializer = None
