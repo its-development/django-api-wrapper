@@ -1028,8 +1028,7 @@ class BasicTokenRefresh(CustomAPIView):
             raise ApiExpiringRefreshTokenIsExpired()
 
         if token.is_access_token_expired:
-            if token.updated_at + timezone.timedelta(seconds=10) < timezone.now():
-                token.regenerate()
+            token.regenerate()
 
         context.update(
             {
