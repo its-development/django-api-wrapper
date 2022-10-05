@@ -263,7 +263,7 @@ class CustomListView(CustomAPIView):
 
     def get_queryset(self):
         objects = self.filter_queryset(
-            self.object_class.objects,
+            self.annotate_queryset(self.object_class.objects),
             self.request_filter,
         )
         objects = objects.order_by(
@@ -273,7 +273,7 @@ class CustomListView(CustomAPIView):
         return objects
 
     def handler(self, request, context):
-        objects = self.annotate_queryset(self.get_queryset())
+        objects = self.get_queryset()
 
         paginator = ApiPaginator(self.request_pagination, distinct=self.distinct_query)
 
