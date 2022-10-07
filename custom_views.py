@@ -1,14 +1,15 @@
-from pprint import pprint
+import traceback
 
+import django
+from django.db import models
 from django.http import HttpResponse
 from django.db.models import Q
 
 from rest_framework.renderers import JSONRenderer
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework import status
 
-from .models import ApiWrapperModel, ApiWrapperAbstractUser
+from .serializers import ApiWrapperModelSerializer
 from .settings import ApiSettings
 from .helpers import ApiHelpers
 from .pagination import ApiPaginator
@@ -18,6 +19,8 @@ from .exceptions import *
 import csv
 import re
 
+from .throttles import BasicPasswordAuthThrottle, BasicTokenRefreshThrottle
+
 
 class CustomAPIView(APIView):
     object_class = None
@@ -26,6 +29,8 @@ class CustomAPIView(APIView):
     serializer_class = None
     enhanced_filters = False
     check_object_permission = True
+    check_serializer_field_permission = True
+    session_data = {}
 
     def __init__(self, *args, **kwargs):
         self.request_content = {}
@@ -36,14 +41,6 @@ class CustomAPIView(APIView):
 
         super().__init__(*args, **kwargs)
 
-    def check_serializer_field_perm(self, serializer):
-        for _, obj in serializer.validated_data.items():
-            if isinstance(obj, (ApiWrapperModel, ApiWrapperAbstractUser)):
-                if not obj.check_obj_perm(self.request):
-                    return False
-
-        return True
-
     def add_user_to_context(self, ctx, request):
         if not request.user:
             return
@@ -52,6 +49,13 @@ class CustomAPIView(APIView):
             return
 
         ctx.update({"user": self.user_serializer(instance=request.user).data})
+
+    def pre_handle_exception(self, e):
+        if ApiSettings.DEBUG:
+            traceback.print_exc()
+        if not isinstance(e, APIException):
+            raise ApiError(e)
+        raise e
 
     def hook_request_data(self, data):
         return data
@@ -62,29 +66,31 @@ class CustomAPIView(APIView):
 
     def get_rest_request_content(self):
         """
-
         :param request:
         :return request.data:
         """
         content = {}
 
-        if self.request:
-            if self.request.method == "GET":
-                content = self.request.GET
+        if not self.request:
+            raise ApiEmptyRequestError()
 
-            elif self.request.method == "PUT":
-                content = self.request.data
+        if self.request.method == "GET":
+            self.request_content = self.request.GET
 
-            elif self.request.method == "DELETE":
-                content = self.request.data
+        elif self.request.method == "PUT":
+            self.request_content = self.request.data
 
-            elif self.request.method == "POST":
-                content = self.request.data
+        elif self.request.method == "DELETE":
+            self.request_content = self.request.data
 
-            elif self.request.method == "PATCH":
-                content = self.request.data
+        elif self.request.method == "POST":
+            self.request_content = self.request.data
 
-        self.request_content = content
+        elif self.request.method == "PATCH":
+            self.request_content = self.request.data
+
+        else:
+            raise ApiMethodNotSupportedError()
 
     def get_request_content_data(self):
         """
@@ -220,31 +226,22 @@ class CustomAPIView(APIView):
 
         return objects
 
-    def get_queryset(self, manager, fil=None):
-        if fil:
-            if isinstance(fil, dict):
-                obj = manager.get(**fil)
-            elif isinstance(fil, Q):
-                obj = manager.get(fil)
-            else:
-                if ApiSettings.DEBUG:
-                    print(type(fil))
-                raise ApiContentFilterWrongFormat()
+    def get_queryset(self):
+        raise NotImplementedError()
 
-        else:
-            raise ApiContentFilterNotProvided()
-
-        if not obj:
-            raise self.object_class.DoesNotExist()
-
-        return obj
+    def annotate_queryset(self, objects):
+        return objects
 
     def handler(self, request, context):
         raise NotImplementedError()
 
     def process(self, request):
         context = ApiContext.default()
-        request, context = self.handler(request, context)
+
+        try:
+            request, context = self.handler(request, context)
+        except Exception as e:
+            self.pre_handle_exception(e)
 
         return Response(
             ApiHelpers.encrypt_context(context)
@@ -264,16 +261,21 @@ class CustomListView(CustomAPIView):
 
         super().__init__(*args, **kwargs)
 
-    def handler(self, request, context):
+    def get_queryset(self):
         objects = self.filter_queryset(
-            self.object_class.objects,
+            self.annotate_queryset(self.object_class.objects),
             self.request_filter,
         )
         objects = objects.order_by(
             *ApiHelpers.eval_expr("(%s)" % (", ".join(self.request_order)))
         )
 
-        paginator = ApiPaginator(self.request_pagination)
+        return objects
+
+    def handler(self, request, context):
+        objects = self.get_queryset()
+
+        paginator = ApiPaginator(self.request_pagination, distinct=self.distinct_query)
 
         result_set = paginator.paginate(
             objects=objects,
@@ -283,14 +285,19 @@ class CustomListView(CustomAPIView):
 
         paginator.update_context(context)
 
-        result_set = [
-            self.return_serializer_class(instance=result).data for result in result_set
-        ]
+        result_set = self.return_serializer_class(
+            result_set,
+            many=True,
+            context={
+                "request": self.request,
+                "check_field_permission": self.check_serializer_field_permission,
+                "action": "view",
+            },
+        ).data
 
         context.update(
             {
                 "results": result_set,
-                "columns": [*self.return_serializer_class.Meta.fields],
             }
         )
 
@@ -302,16 +309,32 @@ class CustomListView(CustomAPIView):
         self.get_rest_request_content()
         self.request_filter = self.get_rest_content_filter()
         self.request_pagination = self.get_rest_content_pagination()
+        self.get_rest_content_flags()
         self.request_order = self.get_rest_content_order()
 
-        request, context = self.handler(request, context)
+        try:
+            request, context = self.handler(request, context)
+        except Exception as e:
+            self.pre_handle_exception(e)
 
         self.add_user_to_context(context, request)
+
+        if self.return_serializer_class:
+            context.update(
+                {
+                    "columns": self.return_serializer_class.get_accessible_fields(
+                        request, self.check_serializer_field_permission
+                    )
+                    if issubclass(
+                        self.return_serializer_class, ApiWrapperModelSerializer
+                    )
+                    else [*self.return_serializer_class.Meta.fields],
+                }
+            )
 
         context.update(
             {
                 "success": True,
-                "status": status.HTTP_200_OK,
             }
         )
 
@@ -337,7 +360,7 @@ class CustomValueListView(CustomAPIView):
 
         super().__init__(*args, **kwargs)
 
-    def handler(self, request, context):
+    def get_queryset(self):
         objects = self.filter_queryset(
             self.object_class.objects,
             self.request_filter,
@@ -345,6 +368,11 @@ class CustomValueListView(CustomAPIView):
         objects = objects.order_by(
             *ApiHelpers.eval_expr("(%s)" % (", ".join(self.request_order)))
         )
+
+        return objects
+
+    def handler(self, request, context):
+        objects = self.get_queryset()
 
         paginator = ApiPaginator(self.request_pagination)
 
@@ -363,7 +391,6 @@ class CustomValueListView(CustomAPIView):
         context.update(
             {
                 "results": result_set,
-                "columns": [self.request_data.get("value")],
             }
         )
 
@@ -379,7 +406,10 @@ class CustomValueListView(CustomAPIView):
         self.request_pagination = self.get_rest_content_pagination()
         self.request_order = self.get_rest_content_order()
 
-        request, context = self.handler(request, context)
+        try:
+            request, context = self.handler(request, context)
+        except Exception as e:
+            self.pre_handle_exception(e)
 
         self.add_user_to_context(context, request)
 
@@ -387,6 +417,7 @@ class CustomValueListView(CustomAPIView):
             {
                 "success": True,
                 "status": status.HTTP_200_OK,
+                "columns": [self.request_data.get("value")],
             }
         )
 
@@ -408,16 +439,52 @@ class CustomGetView(CustomAPIView):
 
         super().__init__(*args, **kwargs)
 
+    def get_queryset(self):
+        if self.request_filter:
+            if isinstance(self.request_filter, dict):
+                try:
+                    obj = self.object_class.objects.get(**self.request_filter)
+                except self.object_class.DoesNotExist:
+                    raise ApiObjectNotFound()
+            elif isinstance(self.request_filter, Q):
+                try:
+                    obj = self.object_class.objects.get(self.request_filter)
+                except self.object_class.DoesNotExist:
+                    raise ApiObjectNotFound()
+            else:
+                if ApiSettings.DEBUG:
+                    print(type(self.request_filter))
+                raise ApiContentFilterWrongFormat()
+
+        else:
+            raise ApiContentFilterNotProvided()
+
+        if not obj:
+            raise self.object_class.DoesNotExist()
+
+        return obj
+
     def handler(self, request, context):
-        obj = self.get_queryset(
-            self.object_class.objects,
-            self.request_filter,
-        )
+        obj = self.get_queryset()
 
         if self.check_object_permission and not obj.check_view_perm(request):
-            raise ApiPermissionError("Object permission denied.")
+            err_msg = "%s: You don't have permission to view this object" % (
+                obj.__class__.__name__
+            )
+            raise ApiPermissionError(err_msg)
 
-        context.update({"result": self.return_serializer_class(obj).data})
+        context.update(
+            {
+                "result": self.return_serializer_class(
+                    instance=obj,
+                    context={
+                        "request": self.request,
+                        "check_field_permission": self.check_serializer_field_permission,
+                        "action": "view",
+                    },
+                ).data
+            }
+        )
 
         return request, context
 
@@ -429,14 +496,34 @@ class CustomGetView(CustomAPIView):
         self.get_rest_content_flags()
         self.get_request_content_data()
 
-        request, context = self.handler(request, context)
+        try:
+            request, context = self.handler(request, context)
+        except Exception as e:
+            self.pre_handle_exception(e)
 
         if isinstance(context, HttpResponse):
             return context
 
         self.add_user_to_context(context, request)
 
-        context.update({"success": True})
+        if self.return_serializer_class:
+            context.update(
+                {
+                    "fields": self.return_serializer_class.get_accessible_fields(
+                        request, self.check_serializer_field_permission
+                    )
+                    if issubclass(
+                        self.return_serializer_class, ApiWrapperModelSerializer
+                    )
+                    else [*self.return_serializer_class.Meta.fields],
+                }
+            )
+
+        context.update(
+            {
+                "success": True,
+            }
+        )
 
         return Response(
             ApiHelpers.encrypt_context(context)
@@ -464,16 +551,18 @@ class CustomCreateView(CustomAPIView):
 
     def handler(self, request, context):
         serializer = self.serializer_class(
-            data=self.request_data, context={"request": request}
+            data=self.request_data,
+            context={
+                "request": request,
+                "check_field_permission": self.check_serializer_field_permission,
+                "action": "add",
+            },
         )
 
         if not serializer.is_valid():
             if ApiSettings.DEBUG:
                 print(serializer.errors)
             raise ApiSerializerInvalid()
-
-        if not self.check_serializer_field_perm(serializer):
-            raise ApiPermissionError()
 
         tmp_object = self.object_class(**serializer.validated_data)
         self.hook_before_creation(tmp_object)
@@ -486,7 +575,16 @@ class CustomCreateView(CustomAPIView):
         self.hook_after_creation(tmp_object)
 
         context.update(
-            {"result": self.return_serializer_class(instance=tmp_object).data}
+            {
+                "result": self.return_serializer_class(
+                    instance=tmp_object,
+                    context={
+                        "request": self.request,
+                        "check_field_permission": self.check_serializer_field_permission,
+                        "action": "view",
+                    },
+                ).data
+            }
         )
 
         return request, context
@@ -498,11 +596,31 @@ class CustomCreateView(CustomAPIView):
         self.get_rest_content_flags()
         self.get_request_content_data()
 
-        request, context = self.handler(request, context)
+        try:
+            request, context = self.handler(request, context)
+        except Exception as e:
+            self.pre_handle_exception(e)
 
         self.add_user_to_context(context, request)
 
-        context.update({"success": True})
+        if self.return_serializer_class:
+            context.update(
+                {
+                    "fields": self.return_serializer_class.get_accessible_fields(
+                        request, self.check_serializer_field_permission
+                    )
+                    if issubclass(
+                        self.return_serializer_class, ApiWrapperModelSerializer
+                    )
+                    else [*self.return_serializer_class.Meta.fields],
+                }
+            )
+
+        context.update(
+            {
+                "success": True,
+            }
+        )
 
         return Response(
             ApiHelpers.encrypt_context(context)
@@ -553,13 +671,22 @@ class CustomUpdateView(CustomAPIView):
         if not object_to_update:
             raise ApiObjectNotFound()
 
-        if not object_to_update.check_change_perm(request):
+        if self.check_object_permission and not object_to_update.check_change_perm(
+            request
+        ):
             raise ApiPermissionError("Object permission denied.")
 
         self.hook_before_update(object_to_update)
 
         serializer = self.serializer_class(
-            instance=object_to_update, data=self.request_data, partial=True
+            instance=object_to_update,
+            data=self.request_data,
+            partial=True,
+            context={
+                "request": self.request,
+                "check_field_permission": self.check_serializer_field_permission,
+                "action": "change",
+            },
         )
 
         if not serializer.is_valid():
@@ -572,7 +699,16 @@ class CustomUpdateView(CustomAPIView):
         self.hook_after_update(updated_object)
 
         context.update(
-            {"result": self.return_serializer_class(instance=updated_object).data}
+            {
+                "result": self.return_serializer_class(
+                    instance=updated_object,
+                    context={
+                        "request": self.request,
+                        "check_field_permission": self.check_serializer_field_permission,
+                        "action": "view",
+                    },
+                ).data
+            }
         )
 
         return request, context
@@ -584,11 +720,31 @@ class CustomUpdateView(CustomAPIView):
         self.get_request_content_data()
         self.get_rest_content_flags()
 
-        request, context = self.handler(request, context)
+        try:
+            request, context = self.handler(request, context)
+        except Exception as e:
+            self.pre_handle_exception(e)
 
         self.add_user_to_context(context, request)
 
-        context.update({"success": True})
+        if self.return_serializer_class:
+            context.update(
+                {
+                    "fields": self.return_serializer_class.get_accessible_fields(
+                        request, self.check_serializer_field_permission
+                    )
+                    if issubclass(
+                        self.return_serializer_class, ApiWrapperModelSerializer
+                    )
+                    else [*self.return_serializer_class.Meta.fields],
+                }
+            )
+
+        context.update(
+            {
+                "success": True,
+            }
+        )
 
         return Response(
             ApiHelpers.encrypt_context(context)
@@ -612,6 +768,12 @@ class CustomDeleteView(CustomAPIView):
         self.request_data = {}
 
         super().__init__(*args, **kwargs)
+
+    def hook_before_delete(self, obj):
+        pass
+
+    def hook_after_delete(self):
+        pass
 
     def handler(self, request, context):
 
@@ -645,7 +807,9 @@ class CustomDeleteView(CustomAPIView):
                 if not obj_to_delete.check_delete_perm(request):
                     continue
 
+                self.hook_before_delete(obj_to_delete)
                 obj_to_delete.delete()
+                self.hook_after_delete()
 
         elif pk:
             obj_to_delete = self.object_class.objects.get(pk=pk)
@@ -656,7 +820,9 @@ class CustomDeleteView(CustomAPIView):
             if not obj_to_delete.check_delete_perm(request):
                 raise ApiPermissionError("Object permission denied.")
 
+            self.hook_before_delete(obj_to_delete)
             obj_to_delete.delete()
+            self.hook_after_delete()
 
         return request, context
 
@@ -667,7 +833,12 @@ class CustomDeleteView(CustomAPIView):
         self.get_request_content_data()
         self.get_rest_content_flags()
 
-        request, context = self.handler(request, context)
+        try:
+            request, context = self.handler(request, context)
+        except django.db.models.deletion.ProtectedError as e:
+            raise ApiDeleteProtectedError()
+        except Exception as e:
+            self.pre_handle_exception(e)
 
         self.add_user_to_context(context, request)
 
@@ -753,12 +924,16 @@ class CustomExportView(CustomAPIView):
 class BasicPasswordAuth(CustomAPIView):
     authentication_classes = []
     permission_classes = []
+    throttle_classes = [BasicPasswordAuthThrottle]
 
     model = None
     model_serializer = None
 
     def _auth_method(self, username, password):
         raise NotImplemented()
+
+    def hook_context(self, context):
+        pass
 
     def process(self, request):
         context = ApiContext.auth()
@@ -780,6 +955,8 @@ class BasicPasswordAuth(CustomAPIView):
         if not user:
             raise ApiAuthFailed()
 
+        self.request.user = user
+
         token = self.model.objects.create(
             user=user, ip_addr=user_ip, user_agent=user_user_agent
         )
@@ -789,11 +966,27 @@ class BasicPasswordAuth(CustomAPIView):
                 "success": True,
                 "status": 200,
                 "results": {
-                    "user": self.serializer_class(instance=user).data,
-                    "token": self.model_serializer(instance=token).data,
+                    "user": self.serializer_class(
+                        instance=user,
+                        context={
+                            "request": self.request,
+                            "check_field_permission": self.check_serializer_field_permission,
+                            "action": "view",
+                        },
+                    ).data,
+                    "token": self.model_serializer(
+                        instance=token,
+                        context={
+                            "request": self.request,
+                            "check_field_permission": self.check_serializer_field_permission,
+                            "action": "view",
+                        },
+                    ).data,
                 },
             }
         )
+
+        self.hook_context(context)
 
         return Response(
             context,
@@ -806,12 +999,16 @@ class BasicPasswordAuth(CustomAPIView):
 class BasicTokenRefresh(CustomAPIView):
     authentication_classes = []
     permission_classes = []
+    throttle_classes = [BasicTokenRefreshThrottle]
 
     model = None
     model_serializer = None
 
     def _auth_method(self, username, password):
         raise NotImplemented()
+
+    def hook_context(self, context):
+        pass
 
     def handler(self, request, context):
         from django.utils import timezone
@@ -824,19 +1021,31 @@ class BasicTokenRefresh(CustomAPIView):
         try:
             token = self.model.objects.get(refresh_token=refresh_token)
         except self.model.DoesNotExist:
-            raise ApiValueError("refresh_token_does_not_exist")
+            raise ApiExpiringRefreshTokenNotFound()
 
         if token.is_refresh_token_expired:
             token.delete()
-            raise ApiValueError("refresh_token expired")
+            raise ApiExpiringRefreshTokenIsExpired()
 
         if token.is_access_token_expired:
-            if token.updated_at + timezone.timedelta(seconds=10) < timezone.now():
-                token.regenerate()
+            token.regenerate()
 
         context.update(
-            {"result": {"token": self.model_serializer(instance=token).data}}
+            {
+                "result": {
+                    "token": self.model_serializer(
+                        instance=token,
+                        context={
+                            "request": self.request,
+                            "check_field_permission": self.check_serializer_field_permission,
+                            "action": "view",
+                        },
+                    ).data
+                }
+            }
         )
+
+        self.hook_context(context)
 
         return request, context
 

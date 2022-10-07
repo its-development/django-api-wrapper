@@ -1,5 +1,24 @@
+from django.contrib.auth.models import UserManager
 from django.db import models
 
 
 class ApiWrapperModelManager(models.Manager):
-    pass
+    def property_annotate(self, queryset):
+        return queryset
+
+    def get_queryset(self):
+        return self.property_annotate(super().get_queryset())
+
+    def get_safe(self, *args, **kwargs):
+        return self.get_queryset().filter(*args, **kwargs).first()
+
+
+class ApiWrapperUserManager(UserManager):
+    def property_annotate(self, queryset):
+        return queryset
+
+    def get_queryset(self):
+        return self.property_annotate(super().get_queryset())
+
+    def get_safe(self, *args, **kwargs):
+        return self.get_queryset().filter(*args, **kwargs).first()

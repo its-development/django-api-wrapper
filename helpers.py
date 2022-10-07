@@ -45,6 +45,14 @@ def eval_(node):
                 return Q(**{node.keywords[0].arg: eval_(node.keywords[0].value)})
             elif isinstance(node.keywords[0].value, ast.List):
                 return Q(**{node.keywords[0].arg: eval_(node.keywords[0].value)})
+            elif isinstance(node.keywords[0].value, ast.BinOp):
+                return Q(**{node.keywords[0].arg: eval_(node.keywords[0].value)})
+            elif isinstance(node.keywords[0].value, ast.UnaryOp):
+                return Q(**{node.keywords[0].arg: eval_(node.keywords[0].value)})
+            else:
+                raise ApiValueError(
+                    "eval_ does not support this function. Hi exploiter :)"
+                )
         elif node.func.id == "Lower":
             return Lower(node.args[0].value)
         elif node.func.id == "Upper":
@@ -64,13 +72,14 @@ def eval_(node):
 class ApiHelpers:
     @staticmethod
     def parse_string(val, template_vars):
+        # Template: [% var1 %]
         res = val
 
-        matches = re.finditer(r"\[(.*?)\]", val)
+        matches = re.finditer(r"\[(.*?)\]", str(val))
 
         for match in matches:
             var = re.search("(?<=\[%).+?(?=\%])", match.group(0)).group(0)
-            res = res.replace(match.group(0), template_vars[var])
+            res = res.replace(match.group(0), str(template_vars[var]))
 
         return res
 
@@ -155,3 +164,34 @@ class ApiHelpers:
             return l[i]
         except IndexError:
             return default
+
+    @staticmethod
+    def generate_model_field_permissions(permission, content_type, model):
+        for action in ["add", "change", "view"]:
+            for field in model._meta.get_fields():
+                perm, _ = permission.objects.get_or_create(
+                    content_type=content_type.objects.get(
+                        app_label=model._meta.app_label,
+                        model=model._meta.model_name,
+                    ),
+                    codename="%s_%s_%s"
+                    % (
+                        action,
+                        model._meta.model_name,
+                        field.name,
+                    ),
+                )
+                perm.name = "Can %s %s.%s" % (
+                    action,
+                    model._meta.model_name,
+                    field.name,
+                )
+                perm.save()
+
+                print(perm.codename)
+
+    @staticmethod
+    def add_set(target, item):
+        l = len(target)
+        target.add(item)
+        return l != len(target)
