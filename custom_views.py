@@ -837,6 +837,8 @@ class CustomDeleteView(CustomAPIView):
             request, context = self.handler(request, context)
         except django.db.models.deletion.ProtectedError as e:
             raise ApiDeleteProtectedError()
+        except django.db.utils.IntegrityError as e:
+            raise ApiDeleteIntegrityError()
         except Exception as e:
             self.pre_handle_exception(e)
 
