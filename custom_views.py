@@ -141,9 +141,7 @@ class CustomAPIView(APIView):
             #  Remove any characters not allowed in variables
             for key in re_filter["expr"]:
                 if isinstance(re_filter["expr"][key], str):
-                    clean_val = str(
-                        re.sub(r"([^A-z0-9\- ]*)", "", str(re_filter["expr"][key]))
-                    )
+                    clean_val = str(re.sub(r"([^A-z0-9\- ]*)", "", str(re_filter["expr"][key])))
 
                 else:
                     clean_val = re_filter["expr"][key]
@@ -170,18 +168,13 @@ class CustomAPIView(APIView):
                         raise ApiValueError("unknown operator")
 
                     generated_filter.append(op)
-                    generated_filter.append(
-                        "%sQ(%s='%s')%s"
-                        % (open_group, clean_key, clean_val, close_group)
-                    )
+                    generated_filter.append("%sQ(%s='%s')%s" % (open_group, clean_key, clean_val, close_group))
 
                 else:
                     raise ApiValueError("Filter operator not provided")
 
             else:
-                generated_filter.append(
-                    "%sQ(%s='%s')%s" % (open_group, clean_key, clean_val, close_group)
-                )
+                generated_filter.append("%sQ(%s='%s')%s" % (open_group, clean_key, clean_val, close_group))
 
         generated_filter = " ".join(generated_filter)
 
@@ -244,9 +237,7 @@ class CustomAPIView(APIView):
             self.pre_handle_exception(e)
 
         return Response(
-            ApiHelpers.encrypt_context(context)
-            if self.request_content.get("encrypt") is True
-            else context,
+            ApiHelpers.encrypt_context(context) if self.request_content.get("encrypt") is True else context,
         )
 
 
@@ -266,9 +257,7 @@ class CustomListView(CustomAPIView):
             self.annotate_queryset(self.object_class.objects),
             self.request_filter,
         )
-        objects = objects.order_by(
-            *ApiHelpers.eval_expr("(%s)" % (", ".join(self.request_order)))
-        )
+        objects = objects.order_by(*ApiHelpers.eval_expr("(%s)" % (", ".join(self.request_order))))
 
         return objects
 
@@ -325,9 +314,7 @@ class CustomListView(CustomAPIView):
                     "columns": self.return_serializer_class.get_accessible_fields(
                         request, self.check_serializer_field_permission
                     )
-                    if issubclass(
-                        self.return_serializer_class, ApiWrapperModelSerializer
-                    )
+                    if issubclass(self.return_serializer_class, ApiWrapperModelSerializer)
                     else [*self.return_serializer_class.Meta.fields],
                 }
             )
@@ -339,9 +326,7 @@ class CustomListView(CustomAPIView):
         )
 
         return Response(
-            ApiHelpers.encrypt_context(context)
-            if self.request_content.get("encrypt") is True
-            else context,
+            ApiHelpers.encrypt_context(context) if self.request_content.get("encrypt") is True else context,
         )
 
     def post(self, request):
@@ -365,9 +350,7 @@ class CustomValueListView(CustomAPIView):
             self.object_class.objects,
             self.request_filter,
         )
-        objects = objects.order_by(
-            *ApiHelpers.eval_expr("(%s)" % (", ".join(self.request_order)))
-        )
+        objects = objects.order_by(*ApiHelpers.eval_expr("(%s)" % (", ".join(self.request_order))))
 
         return objects
 
@@ -383,10 +366,7 @@ class CustomValueListView(CustomAPIView):
         )
         paginator.update_context(context)
 
-        result_set = [
-            ApiHelpers.rgetattr(result, self.request_data.get("value"))
-            for result in result_set
-        ]
+        result_set = [ApiHelpers.rgetattr(result, self.request_data.get("value")) for result in result_set]
 
         context.update(
             {
@@ -422,9 +402,7 @@ class CustomValueListView(CustomAPIView):
         )
 
         return Response(
-            ApiHelpers.encrypt_context(context)
-            if self.request_content.get("encrypt") is True
-            else context,
+            ApiHelpers.encrypt_context(context) if self.request_content.get("encrypt") is True else context,
         )
 
     def post(self, request):
@@ -443,12 +421,12 @@ class CustomGetView(CustomAPIView):
         if self.request_filter:
             if isinstance(self.request_filter, dict):
                 try:
-                    obj = self.object_class.objects.get(**self.request_filter)
+                    obj = self.annotate_queryset(self.object_class.objects).get(**self.request_filter)
                 except self.object_class.DoesNotExist:
                     raise ApiObjectNotFound()
             elif isinstance(self.request_filter, Q):
                 try:
-                    obj = self.object_class.objects.get(self.request_filter)
+                    obj = self.annotate_queryset(self.object_class.objects).get(self.request_filter)
                 except self.object_class.DoesNotExist:
                     raise ApiObjectNotFound()
             else:
@@ -468,9 +446,7 @@ class CustomGetView(CustomAPIView):
         obj = self.get_queryset()
 
         if self.check_object_permission and not obj.check_view_perm(request):
-            err_msg = "%s: You don't have permission to view this object" % (
-                obj.__class__.__name__
-            )
+            err_msg = "%s: You don't have permission to view this object" % (obj.__class__.__name__)
             raise ApiPermissionError(err_msg)
 
         context.update(
@@ -512,9 +488,7 @@ class CustomGetView(CustomAPIView):
                     "fields": self.return_serializer_class.get_accessible_fields(
                         request, self.check_serializer_field_permission
                     )
-                    if issubclass(
-                        self.return_serializer_class, ApiWrapperModelSerializer
-                    )
+                    if issubclass(self.return_serializer_class, ApiWrapperModelSerializer)
                     else [*self.return_serializer_class.Meta.fields],
                 }
             )
@@ -526,9 +500,7 @@ class CustomGetView(CustomAPIView):
         )
 
         return Response(
-            ApiHelpers.encrypt_context(context)
-            if self.request_content.get("encrypt") is True
-            else context,
+            ApiHelpers.encrypt_context(context) if self.request_content.get("encrypt") is True else context,
         )
 
     def post(self, request):
@@ -609,9 +581,7 @@ class CustomCreateView(CustomAPIView):
                     "fields": self.return_serializer_class.get_accessible_fields(
                         request, self.check_serializer_field_permission
                     )
-                    if issubclass(
-                        self.return_serializer_class, ApiWrapperModelSerializer
-                    )
+                    if issubclass(self.return_serializer_class, ApiWrapperModelSerializer)
                     else [*self.return_serializer_class.Meta.fields],
                 }
             )
@@ -623,9 +593,7 @@ class CustomCreateView(CustomAPIView):
         )
 
         return Response(
-            ApiHelpers.encrypt_context(context)
-            if self.request_content.get("encrypt") is True
-            else context,
+            ApiHelpers.encrypt_context(context) if self.request_content.get("encrypt") is True else context,
             status=status.HTTP_201_CREATED,
         )
 
@@ -660,20 +628,14 @@ class CustomUpdateView(CustomAPIView):
         if "id" not in self.request_data and "pk" not in self.request_data:
             raise ApiContentDataPkNotProvided()
 
-        pk = (
-            self.request_data.get("id")
-            if self.request_data.get("id")
-            else self.request_data.get("pk")
-        )
+        pk = self.request_data.get("id") if self.request_data.get("id") else self.request_data.get("pk")
 
         object_to_update = self.object_class.objects.get(pk=pk)
 
         if not object_to_update:
             raise ApiObjectNotFound()
 
-        if self.check_object_permission and not object_to_update.check_change_perm(
-            request
-        ):
+        if self.check_object_permission and not object_to_update.check_change_perm(request):
             raise ApiPermissionError("Object permission denied.")
 
         self.hook_before_update(object_to_update)
@@ -733,9 +695,7 @@ class CustomUpdateView(CustomAPIView):
                     "fields": self.return_serializer_class.get_accessible_fields(
                         request, self.check_serializer_field_permission
                     )
-                    if issubclass(
-                        self.return_serializer_class, ApiWrapperModelSerializer
-                    )
+                    if issubclass(self.return_serializer_class, ApiWrapperModelSerializer)
                     else [*self.return_serializer_class.Meta.fields],
                 }
             )
@@ -747,9 +707,7 @@ class CustomUpdateView(CustomAPIView):
         )
 
         return Response(
-            ApiHelpers.encrypt_context(context)
-            if self.request_content.get("encrypt") is True
-            else context,
+            ApiHelpers.encrypt_context(context) if self.request_content.get("encrypt") is True else context,
         )
 
     def patch(self, request):
@@ -785,11 +743,7 @@ class CustomDeleteView(CustomAPIView):
         ):
             raise ApiContentDataPkNotProvided()
 
-        pk = (
-            self.request_data.get("id")
-            if self.request_data.get("id")
-            else self.request_data.get("pk")
-        )
+        pk = self.request_data.get("id") if self.request_data.get("id") else self.request_data.get("pk")
 
         pk_set = (
             self.request_data.get("id_set", [])
@@ -847,9 +801,7 @@ class CustomDeleteView(CustomAPIView):
         context.update({"status": 200, "success": True})
 
         return Response(
-            ApiHelpers.encrypt_context(context)
-            if self.request_content.get("encrypt") is True
-            else context,
+            ApiHelpers.encrypt_context(context) if self.request_content.get("encrypt") is True else context,
         )
 
     def post(self, request):
@@ -959,9 +911,7 @@ class BasicPasswordAuth(CustomAPIView):
 
         self.request.user = user
 
-        token = self.model.objects.create(
-            user=user, ip_addr=user_ip, user_agent=user_user_agent
-        )
+        token = self.model.objects.create(user=user, ip_addr=user_ip, user_agent=user_user_agent)
 
         context.update(
             {
@@ -1063,9 +1013,7 @@ class BasicTokenRefresh(CustomAPIView):
         context.update({"success": True})
 
         return Response(
-            ApiHelpers.encrypt_context(context)
-            if self.request_content.get("encrypt") is True
-            else context,
+            ApiHelpers.encrypt_context(context) if self.request_content.get("encrypt") is True else context,
         )
 
     def post(self, request):
