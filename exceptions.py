@@ -82,7 +82,7 @@ class ApiExpiringTokenIsExpired(APIException):
 
 
 class ApiExpiringRefreshTokenIsExpired(APIException):
-    status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+    status_code = status.HTTP_401_UNAUTHORIZED
     default_detail = "ApiExpiringRefreshTokenIsExpired"
     default_code = "api_expiring_refresh_token_is_expired"
 
