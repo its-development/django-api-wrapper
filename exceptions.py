@@ -63,6 +63,12 @@ class ApiAuthInvalid(APIException):
     default_code = "api_auth_invalid"
 
 
+class ApiAuthUserNotActive(APIException):
+    status_code = status.HTTP_401_UNAUTHORIZED
+    default_detail = "ApiAuthUserNotActive"
+    default_code = "api_auth_user_not_active"
+
+
 class ApiExpiringTokenNotFound(APIException):
     status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
     default_detail = "ApiExpiringTokenNotFound"
