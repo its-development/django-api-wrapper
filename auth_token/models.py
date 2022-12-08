@@ -34,23 +34,32 @@ def get_default_refresh_token_validity():
 class ExpiringToken(ApiWrapperModel):
     class Meta:
         abstract = True
-        db_table = "auth_expiry_tokens"
-        verbose_name = "Token"
-        verbose_name_plural = "Tokens"
-
-    access_token = models.CharField(default=generate_key, max_length=254, unique=True)
-    access_token_expires = models.DateTimeField(default=get_default_access_token_expiry)
-    access_token_valid_until = models.DateTimeField(default=get_default_access_token_validity)
-
-    refresh_token = models.CharField(default=generate_key, max_length=254)
-    refresh_token_expires = models.DateTimeField(default=get_default_refresh_token_expiry)
-    refresh_token_valid_until = models.DateTimeField(default=get_default_refresh_token_validity)
 
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         related_name="auth_tokens",
         on_delete=models.CASCADE,
         verbose_name="User",
+    )
+
+    access_token = models.CharField(
+        default=generate_key,
+        max_length=custom_settings.EXPIRING_TOKEN_LENGTH,
+        unique=True,
+    )
+    access_token_expires = models.DateTimeField(default=get_default_access_token_expiry)
+    access_token_valid_until = models.DateTimeField(
+        default=get_default_access_token_validity
+    )
+
+    refresh_token = models.CharField(
+        default=generate_key, max_length=custom_settings.EXPIRING_TOKEN_LENGTH
+    )
+    refresh_token_expires = models.DateTimeField(
+        default=get_default_refresh_token_expiry
+    )
+    refresh_token_valid_until = models.DateTimeField(
+        default=get_default_refresh_token_validity
     )
 
     ip_addr = models.GenericIPAddressField(default=None, null=True)
@@ -61,11 +70,15 @@ class ExpiringToken(ApiWrapperModel):
 
     @property
     def is_access_token_expired(self):
-        return is_time_expired(self.access_token_expires) or is_time_expired(self.access_token_valid_until)
+        return is_time_expired(self.access_token_expires) or is_time_expired(
+            self.access_token_valid_until
+        )
 
     @property
     def is_refresh_token_expired(self):
-        return is_time_expired(self.refresh_token_expires) or is_time_expired(self.refresh_token_valid_until)
+        return is_time_expired(self.refresh_token_expires) or is_time_expired(
+            self.refresh_token_valid_until
+        )
 
     def save(self, *args, **kwargs):
 
