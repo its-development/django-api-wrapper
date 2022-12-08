@@ -125,61 +125,6 @@ class CustomAPIView(APIView):
         """
         return self.parse_filter(self.request_content.get("filter", None))
 
-    @staticmethod
-    def generate_enhanced_filters(request_filter=None):
-        """
-        :param request_filter:
-        :return generated filter expression:
-        """
-        generated_filter = []
-
-        for i, re_filter in enumerate(request_filter):
-            op = "&"
-            open_group = ""
-            close_group = ""
-
-            #  Remove any characters not allowed in variables
-            for key in re_filter["expr"]:
-                if isinstance(re_filter["expr"][key], str):
-                    clean_val = str(re.sub(r"([^A-z0-9\- ]*)", "", str(re_filter["expr"][key])))
-
-                else:
-                    clean_val = re_filter["expr"][key]
-
-                clean_key = re.sub(r"([^A-z0-9\-]*)", "", key)
-                break
-
-            if "open" in re_filter:
-                open_group = "("
-
-            elif "close" in re_filter:
-                close_group = ")"
-
-            if i > 0:
-
-                if "operator" in re_filter:
-                    if re_filter["operator"] == "or":
-                        op = "|"
-
-                    elif re_filter["operator"] == "and":
-                        op = "&"
-
-                    else:
-                        raise ApiValueError("unknown operator")
-
-                    generated_filter.append(op)
-                    generated_filter.append("%sQ(%s='%s')%s" % (open_group, clean_key, clean_val, close_group))
-
-                else:
-                    raise ApiValueError("Filter operator not provided")
-
-            else:
-                generated_filter.append("%sQ(%s='%s')%s" % (open_group, clean_key, clean_val, close_group))
-
-        generated_filter = " ".join(generated_filter)
-
-        return ApiHelpers.eval_expr(generated_filter) if generated_filter else None
-
     def get_rest_content_order(self):
         """
         :return self.request_content.filter:
