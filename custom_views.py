@@ -889,14 +889,16 @@ class BasicPasswordAuth(CustomAPIView):
         if "username" not in self.request_data or "password" not in self.request_data:
             raise ApiAuthUsernameOrPasswordNotProvided()
 
-        user = self._auth_method(
+        user, token = self._auth_method(
             username=self.request_data["username"],
             password=self.request_data["password"],
         )
 
-        self.request.user = user
-
-        token = self.model.objects.create(user=user, ip_addr=user_ip, user_agent=user_user_agent)
+        try:
+            # Delete expired tokens
+            self.model.delete_expired(user)
+        except:
+            pass
 
         context.update(
             {
