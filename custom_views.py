@@ -894,6 +894,8 @@ class BasicPasswordAuth(CustomAPIView):
             password=self.request_data["password"],
         )
 
+        self.request.user = user
+
         try:
             # Delete expired tokens
             self.model.delete_expired(user)
