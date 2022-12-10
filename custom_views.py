@@ -504,7 +504,18 @@ class CustomCreateView(CustomAPIView):
         if not serializer.is_valid():
             if ApiSettings.DEBUG:
                 print(serializer.errors)
-            raise ApiSerializerInvalid()
+
+            field = ApiHelpers.list_get(list(serializer.errors.keys()), 0, None)
+            if not field:
+                raise ApiSerializerInvalid()
+
+            err_type = ApiHelpers.list_get(serializer.errors.get(field), 0, None)
+            if not err_type:
+                raise ApiSerializerInvalid()
+
+            raise ApiSerializerInvalid(
+                code="%s%s" % (ApiSerializerInvalid.default_code, "%s%s" % (field, err_type.code))
+            )
 
         tmp_object = self.object_class(**serializer.validated_data)
         self.hook_before_creation(tmp_object)
