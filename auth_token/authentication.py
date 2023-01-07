@@ -14,6 +14,8 @@ class ExpiringTokenAuthentication(TokenAuthentication):
     model = None
     keyword = "token"
 
+    check_ip = True
+
     def authenticate(self, request):
         """
         Returns None to hand over to the next authentication class.
@@ -28,9 +30,10 @@ class ExpiringTokenAuthentication(TokenAuthentication):
         if not user or not token:
             raise None
 
-        if not token.ip_addr or token.ip_addr != ApiHelpers.get_client_ip(request):
-            token.delete()
-            raise ApiValueError("IP missmatch")
+        if self.check_ip:
+            if not token.ip_addr or token.ip_addr != ApiHelpers.get_client_ip(request):
+                token.delete()
+                raise ApiValueError("IP missmatch")
 
         return user, token
 
@@ -50,9 +53,7 @@ class ExpiringTokenAuthentication(TokenAuthentication):
             token.delete()
             raise AuthenticationFailed("The Refresh Token is expired")
 
-        token.refresh_token_expires = (
-            timezone.now() + custom_settings.EXPIRING_REFRESH_TOKEN_DURATION
-        )
+        token.refresh_token_expires = timezone.now() + custom_settings.EXPIRING_REFRESH_TOKEN_DURATION
         token.save()
 
         return token.user, token
