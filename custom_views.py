@@ -1,7 +1,7 @@
 import traceback
 
 import django
-from django.db import models
+from django.db import models, transaction
 from django.http import HttpResponse
 from django.db.models import Q
 
@@ -23,6 +23,8 @@ from .throttles import BasicPasswordAuthThrottle, BasicTokenRefreshThrottle
 
 
 class CustomAPIView(APIView):
+    transactional = True
+
     object_class = None
     return_serializer_class = None
     user_serializer = None
@@ -283,6 +285,10 @@ class CustomListView(CustomAPIView):
         )
 
     def post(self, request):
+        if self.transactional:
+            with transaction.atomic():
+                return self.process(request)
+
         return self.process(request)
 
 
@@ -366,6 +372,10 @@ class CustomValueListView(CustomAPIView):
         )
 
     def post(self, request):
+        if self.transactional:
+            with transaction.atomic():
+                return self.process(request)
+
         return self.process(request)
 
 
@@ -474,6 +484,10 @@ class CustomGetView(CustomAPIView):
         )
 
     def post(self, request):
+        if self.transactional:
+            with transaction.atomic():
+                return self.process(request)
+
         return self.process(request)
 
 
@@ -514,7 +528,8 @@ class CustomCreateView(CustomAPIView):
                 raise ApiSerializerInvalid()
 
             raise ApiSerializerInvalid(
-                code="%s%s" % (ApiSerializerInvalid.default_code, "%s%s" % (field, err_type.code))
+                code="%s%s"
+                % (ApiSerializerInvalid.default_code, "%s%s" % (field, err_type.code))
             )
 
         tmp_object = self.object_class(**serializer.validated_data)
@@ -586,6 +601,10 @@ class CustomCreateView(CustomAPIView):
         return self.process(request)
 
     def post(self, request):
+        if self.transactional:
+            with transaction.atomic():
+                return self.process(request)
+
         return self.process(request)
 
 
@@ -706,6 +725,10 @@ class CustomUpdateView(CustomAPIView):
         )
 
     def patch(self, request):
+        if self.transactional:
+            with transaction.atomic():
+                return self.process(request)
+
         return self.process(request)
 
 
@@ -806,6 +829,10 @@ class CustomDeleteView(CustomAPIView):
         )
 
     def post(self, request):
+        if self.transactional:
+            with transaction.atomic():
+                return self.process(request)
+
         return self.process(request)
 
 
