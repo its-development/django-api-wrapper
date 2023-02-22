@@ -1,5 +1,6 @@
 from rest_framework.views import exception_handler
 from api.context import ApiContext
+from api.custom_views import CustomAPIView
 from api.settings import ApiSettings
 
 
@@ -15,6 +16,13 @@ def custom_exception_handler(exc, context):
     # to get the standard error response.
     response = exception_handler(exc, context)
     messages = []
+
+    try:
+        request = context.get("view")
+        if isinstance(request, CustomAPIView):
+            messages.extend(request.context.get("messages", []))
+    except:
+        pass
 
     if response is not None:
 

@@ -17,7 +17,6 @@ from .context import ApiContext
 from .exceptions import *
 
 import csv
-import re
 
 from .throttles import BasicPasswordAuthThrottle, BasicTokenRefreshThrottle
 
@@ -43,14 +42,26 @@ class CustomAPIView(APIView):
 
         super().__init__(*args, **kwargs)
 
-    def add_user_to_context(self, ctx, request):
-        if not request.user:
+    def respond(self, http_code=status.HTTP_200_OK):
+        return Response(
+            ApiHelpers.encrypt_context(self.context)
+            if self.request_content.get("encrypt") is True
+            else self.context,
+            status=http_code,
+        )
+
+    def add_user_to_context(self):
+        if not self.request.user:
             return
 
         if not self.user_serializer:
             return
 
-        ctx.update({"user": self.user_serializer(instance=request.user).data})
+        self.context.update(
+            {
+                "user": self.user_serializer(instance=self.request.user).data,
+            }
+        )
 
     def pre_handle_exception(self, e):
         if ApiSettings.DEBUG:
@@ -58,6 +69,35 @@ class CustomAPIView(APIView):
         if not isinstance(e, APIException):
             raise ApiError(e)
         raise e
+
+    def handle_invalid_serializer(self, serializer):
+        if ApiSettings.DEBUG:
+            print(serializer.errors)
+
+        field = ApiHelpers.list_get(list(serializer.errors.keys()), 0, None)
+        if not field:
+            raise ApiSerializerInvalid()
+
+        err_type = ApiHelpers.list_get(serializer.errors.get(field), 0, None)
+        if not err_type:
+            raise ApiSerializerInvalid()
+
+        for field in serializer.errors:
+            err_code = ApiHelpers.list_get(serializer.errors.get(field), 0, "None")
+            self.context.update(
+                {
+                    "messages": self.context.get("messages", [])
+                    + [
+                        {
+                            "type": "SerializerError",
+                            "field": field,
+                            "code": err_code.code,
+                        }
+                    ]
+                }
+            )
+
+        raise ApiSerializerInvalid()
 
     def hook_request_data(self, data):
         return data
@@ -172,22 +212,8 @@ class CustomAPIView(APIView):
     def annotate_queryset(self, objects):
         return objects
 
-    def handler(self, request, context):
+    def handler(self):
         raise NotImplementedError()
-
-    def process(self, request):
-        context = ApiContext.default()
-
-        try:
-            request, context = self.handler(request, context)
-        except Exception as e:
-            self.pre_handle_exception(e)
-
-        return Response(
-            ApiHelpers.encrypt_context(context)
-            if self.request_content.get("encrypt") is True
-            else context,
-        )
 
 
 class CustomListView(CustomAPIView):
@@ -195,6 +221,7 @@ class CustomListView(CustomAPIView):
     distinct_query = False
 
     def __init__(self, *args, **kwargs):
+        self.context = ApiContext.list()
         self.request_filter = {}
         self.request_pagination = {}
         self.request_order = []
@@ -212,18 +239,18 @@ class CustomListView(CustomAPIView):
 
         return objects
 
-    def handler(self, request, context):
+    def handler(self):
         objects = self.get_queryset()
 
         paginator = ApiPaginator(self.request_pagination, distinct=self.distinct_query)
 
         result_set = paginator.paginate(
             objects=objects,
-            request=request,
+            request=self.request,
             check_object_permission=self.check_object_permission,
         )
 
-        paginator.update_context(context)
+        paginator.update_context(self.context)
 
         result_set = self.return_serializer_class(
             result_set,
@@ -235,17 +262,13 @@ class CustomListView(CustomAPIView):
             },
         ).data
 
-        context.update(
+        self.context.update(
             {
                 "results": result_set,
             }
         )
 
-        return request, context
-
-    def process(self, request):
-        context = ApiContext.list()
-
+    def process(self):
         self.get_rest_request_content()
         self.request_filter = self.get_rest_content_filter()
         self.request_pagination = self.get_rest_content_pagination()
@@ -253,17 +276,17 @@ class CustomListView(CustomAPIView):
         self.request_order = self.get_rest_content_order()
 
         try:
-            request, context = self.handler(request, context)
+            self.handler()
         except Exception as e:
             self.pre_handle_exception(e)
 
-        self.add_user_to_context(context, request)
+        self.add_user_to_context()
 
         if self.return_serializer_class:
-            context.update(
+            self.context.update(
                 {
                     "columns": self.return_serializer_class.get_accessible_fields(
-                        request, self.check_serializer_field_permission
+                        self.request, self.check_serializer_field_permission
                     )
                     if issubclass(
                         self.return_serializer_class, ApiWrapperModelSerializer
@@ -272,24 +295,20 @@ class CustomListView(CustomAPIView):
                 }
             )
 
-        context.update(
+        self.context.update(
             {
                 "success": True,
             }
         )
 
-        return Response(
-            ApiHelpers.encrypt_context(context)
-            if self.request_content.get("encrypt") is True
-            else context,
-        )
+        return self.respond(status.HTTP_200_OK)
 
     def post(self, request):
         if self.transactional:
             with transaction.atomic():
-                return self.process(request)
+                return self.process()
 
-        return self.process(request)
+        return self.process()
 
 
 class CustomValueListView(CustomAPIView):
@@ -315,34 +334,30 @@ class CustomValueListView(CustomAPIView):
 
         return objects
 
-    def handler(self, request, context):
+    def handler(self):
         objects = self.get_queryset()
 
         paginator = ApiPaginator(self.request_pagination)
 
         result_set = paginator.paginate(
             objects=objects,
-            request=request,
+            request=self.request,
             check_object_permission=self.check_object_permission,
         )
-        paginator.update_context(context)
+        paginator.update_context(self.context)
 
         result_set = [
             ApiHelpers.rgetattr(result, self.request_data.get("value"))
             for result in result_set
         ]
 
-        context.update(
+        self.context.update(
             {
                 "results": result_set,
             }
         )
 
-        return request, context
-
-    def process(self, request):
-        context = ApiContext.list()
-
+    def process(self):
         self.get_rest_request_content()
         self.get_request_content_data()
 
@@ -351,13 +366,13 @@ class CustomValueListView(CustomAPIView):
         self.request_order = self.get_rest_content_order()
 
         try:
-            request, context = self.handler(request, context)
+            self.handler()
         except Exception as e:
             self.pre_handle_exception(e)
 
-        self.add_user_to_context(context, request)
+        self.add_user_to_context()
 
-        context.update(
+        self.context.update(
             {
                 "success": True,
                 "status": status.HTTP_200_OK,
@@ -365,24 +380,21 @@ class CustomValueListView(CustomAPIView):
             }
         )
 
-        return Response(
-            ApiHelpers.encrypt_context(context)
-            if self.request_content.get("encrypt") is True
-            else context,
-        )
+        return self.respond(status.HTTP_200_OK)
 
     def post(self, request):
         if self.transactional:
             with transaction.atomic():
-                return self.process(request)
+                return self.process()
 
-        return self.process(request)
+        return self.process()
 
 
 class CustomGetView(CustomAPIView):
     renderer_classes = [JSONRenderer]
 
     def __init__(self, *args, **kwargs):
+        self.context = ApiContext.get()
         self.request_data = {}
 
         super().__init__(*args, **kwargs)
@@ -416,16 +428,16 @@ class CustomGetView(CustomAPIView):
 
         return obj
 
-    def handler(self, request, context):
+    def handler(self):
         obj = self.get_queryset()
 
-        if self.check_object_permission and not obj.check_view_perm(request):
+        if self.check_object_permission and not obj.check_view_perm(self.request):
             err_msg = "%s: You don't have permission to view this object" % (
                 obj.__class__.__name__
             )
             raise ApiPermissionError(err_msg)
 
-        context.update(
+        self.context.update(
             {
                 "result": self.return_serializer_class(
                     instance=obj,
@@ -438,31 +450,27 @@ class CustomGetView(CustomAPIView):
             }
         )
 
-        return request, context
-
-    def process(self, request):
-        context = ApiContext.get()
-
+    def process(self):
         self.get_rest_request_content()
         self.request_filter = self.get_rest_content_filter()
         self.get_rest_content_flags()
         self.get_request_content_data()
 
         try:
-            request, context = self.handler(request, context)
+            self.handler()
         except Exception as e:
             self.pre_handle_exception(e)
 
-        if isinstance(context, HttpResponse):
-            return context
+        if isinstance(self.context, HttpResponse):
+            return self.context
 
-        self.add_user_to_context(context, request)
+        self.add_user_to_context()
 
         if self.return_serializer_class:
-            context.update(
+            self.context.update(
                 {
                     "fields": self.return_serializer_class.get_accessible_fields(
-                        request, self.check_serializer_field_permission
+                        self.request, self.check_serializer_field_permission
                     )
                     if issubclass(
                         self.return_serializer_class, ApiWrapperModelSerializer
@@ -471,30 +479,27 @@ class CustomGetView(CustomAPIView):
                 }
             )
 
-        context.update(
+        self.context.update(
             {
                 "success": True,
             }
         )
 
-        return Response(
-            ApiHelpers.encrypt_context(context)
-            if self.request_content.get("encrypt") is True
-            else context,
-        )
+        return self.respond(status.HTTP_200_OK)
 
     def post(self, request):
         if self.transactional:
             with transaction.atomic():
-                return self.process(request)
+                return self.process()
 
-        return self.process(request)
+        return self.process()
 
 
 class CustomCreateView(CustomAPIView):
     renderer_classes = [JSONRenderer]
 
     def __init__(self, *args, **kwargs):
+        self.context = ApiContext.create()
         self.request_data = {}
 
         super().__init__(*args, **kwargs)
@@ -505,44 +510,30 @@ class CustomCreateView(CustomAPIView):
     def hook_before_creation(self, tmp_obj):
         pass
 
-    def handler(self, request, context):
+    def handler(self):
         serializer = self.serializer_class(
             data=self.request_data,
             context={
-                "request": request,
+                "request": self.request,
                 "check_field_permission": self.check_serializer_field_permission,
                 "action": "add",
             },
         )
 
         if not serializer.is_valid():
-            if ApiSettings.DEBUG:
-                print(serializer.errors)
-
-            field = ApiHelpers.list_get(list(serializer.errors.keys()), 0, None)
-            if not field:
-                raise ApiSerializerInvalid()
-
-            err_type = ApiHelpers.list_get(serializer.errors.get(field), 0, None)
-            if not err_type:
-                raise ApiSerializerInvalid()
-
-            raise ApiSerializerInvalid(
-                code="%s%s"
-                % (ApiSerializerInvalid.default_code, "%s%s" % (field, err_type.code))
-            )
+            self.handle_invalid_serializer(serializer)
 
         tmp_object = self.object_class(**serializer.validated_data)
         self.hook_before_creation(tmp_object)
 
-        if self.check_object_permission and not tmp_object.check_add_perm(request):
+        if self.check_object_permission and not tmp_object.check_add_perm(self.request):
             raise ApiPermissionError()
 
         tmp_object.save()
 
         self.hook_after_creation(tmp_object)
 
-        context.update(
+        self.context.update(
             {
                 "result": self.return_serializer_class(
                     instance=tmp_object,
@@ -555,27 +546,23 @@ class CustomCreateView(CustomAPIView):
             }
         )
 
-        return request, context
-
-    def process(self, request):
-        context = ApiContext.create()
-
+    def process(self):
         self.get_rest_request_content()
         self.get_rest_content_flags()
         self.get_request_content_data()
 
         try:
-            request, context = self.handler(request, context)
+            self.handler()
         except Exception as e:
             self.pre_handle_exception(e)
 
-        self.add_user_to_context(context, request)
+        self.add_user_to_context()
 
         if self.return_serializer_class:
-            context.update(
+            self.context.update(
                 {
                     "fields": self.return_serializer_class.get_accessible_fields(
-                        request, self.check_serializer_field_permission
+                        self.request, self.check_serializer_field_permission
                     )
                     if issubclass(
                         self.return_serializer_class, ApiWrapperModelSerializer
@@ -584,28 +571,23 @@ class CustomCreateView(CustomAPIView):
                 }
             )
 
-        context.update(
+        self.context.update(
             {
                 "success": True,
             }
         )
 
-        return Response(
-            ApiHelpers.encrypt_context(context)
-            if self.request_content.get("encrypt") is True
-            else context,
-            status=status.HTTP_201_CREATED,
-        )
+        return self.respond(status.HTTP_201_CREATED)
 
     def put(self, request):
-        return self.process(request)
+        return self.process()
 
     def post(self, request):
         if self.transactional:
             with transaction.atomic():
-                return self.process(request)
+                return self.process()
 
-        return self.process(request)
+        return self.process()
 
 
 class CustomAddView(CustomCreateView):
@@ -617,6 +599,7 @@ class CustomUpdateView(CustomAPIView):
     renderer_classes = [JSONRenderer]
 
     def __init__(self, *args, **kwargs):
+        self.context = ApiContext.update()
         self.request_data = {}
 
         super().__init__(*args, **kwargs)
@@ -627,7 +610,7 @@ class CustomUpdateView(CustomAPIView):
     def hook_after_update(self, obj):
         pass
 
-    def handler(self, request, context):
+    def handler(self):
 
         if "id" not in self.request_data and "pk" not in self.request_data:
             raise ApiContentDataPkNotProvided()
@@ -644,7 +627,7 @@ class CustomUpdateView(CustomAPIView):
             raise ApiObjectNotFound()
 
         if self.check_object_permission and not object_to_update.check_change_perm(
-            request
+            self.request
         ):
             raise ApiPermissionError("Object permission denied.")
 
@@ -662,15 +645,13 @@ class CustomUpdateView(CustomAPIView):
         )
 
         if not serializer.is_valid():
-            if ApiSettings.DEBUG:
-                print(serializer.errors)
-            raise ApiSerializerInvalid()
+            self.handle_invalid_serializer(serializer)
 
         updated_object = serializer.save()
 
         self.hook_after_update(updated_object)
 
-        context.update(
+        self.context.update(
             {
                 "result": self.return_serializer_class(
                     instance=updated_object,
@@ -683,27 +664,23 @@ class CustomUpdateView(CustomAPIView):
             }
         )
 
-        return request, context
-
-    def process(self, request):
-        context = ApiContext.update()
-
+    def process(self):
         self.get_rest_request_content()
         self.get_request_content_data()
         self.get_rest_content_flags()
 
         try:
-            request, context = self.handler(request, context)
+            self.handler()
         except Exception as e:
             self.pre_handle_exception(e)
 
-        self.add_user_to_context(context, request)
+        self.add_user_to_context()
 
         if self.return_serializer_class:
-            context.update(
+            self.context.update(
                 {
                     "fields": self.return_serializer_class.get_accessible_fields(
-                        request, self.check_serializer_field_permission
+                        self.request, self.check_serializer_field_permission
                     )
                     if issubclass(
                         self.return_serializer_class, ApiWrapperModelSerializer
@@ -712,24 +689,20 @@ class CustomUpdateView(CustomAPIView):
                 }
             )
 
-        context.update(
+        self.context.update(
             {
                 "success": True,
             }
         )
 
-        return Response(
-            ApiHelpers.encrypt_context(context)
-            if self.request_content.get("encrypt") is True
-            else context,
-        )
+        return self.respond(status.HTTP_200_OK)
 
     def patch(self, request):
         if self.transactional:
             with transaction.atomic():
-                return self.process(request)
+                return self.process()
 
-        return self.process(request)
+        return self.process()
 
 
 class CustomChangeView(CustomUpdateView):
@@ -741,6 +714,7 @@ class CustomDeleteView(CustomAPIView):
     renderer_classes = [JSONRenderer]
 
     def __init__(self, *args, **kwargs):
+        self.context = ApiContext.delete()
         self.request_data = {}
 
         super().__init__(*args, **kwargs)
@@ -751,7 +725,7 @@ class CustomDeleteView(CustomAPIView):
     def hook_after_delete(self):
         pass
 
-    def handler(self, request, context):
+    def handler(self):
 
         if (
             "id" not in self.request_data
@@ -780,7 +754,7 @@ class CustomDeleteView(CustomAPIView):
                 if not obj_to_delete:
                     raise ApiObjectNotFound()
 
-                if not obj_to_delete.check_delete_perm(request):
+                if not obj_to_delete.check_delete_perm(self.request):
                     continue
 
                 self.hook_before_delete(obj_to_delete)
@@ -793,24 +767,20 @@ class CustomDeleteView(CustomAPIView):
             if not obj_to_delete:
                 raise ApiObjectNotFound()
 
-            if not obj_to_delete.check_delete_perm(request):
+            if not obj_to_delete.check_delete_perm(self.request):
                 raise ApiPermissionError("Object permission denied.")
 
             self.hook_before_delete(obj_to_delete)
             obj_to_delete.delete()
             self.hook_after_delete()
 
-        return request, context
-
-    def process(self, request):
-        context = ApiContext.remove()
-
+    def process(self):
         self.get_rest_request_content()
         self.get_request_content_data()
         self.get_rest_content_flags()
 
         try:
-            request, context = self.handler(request, context)
+            self.handler()
         except django.db.models.deletion.ProtectedError as e:
             raise ApiDeleteProtectedError()
         except django.db.utils.IntegrityError as e:
@@ -818,22 +788,18 @@ class CustomDeleteView(CustomAPIView):
         except Exception as e:
             self.pre_handle_exception(e)
 
-        self.add_user_to_context(context, request)
+        self.add_user_to_context()
 
-        context.update({"status": 200, "success": True})
+        self.context.update({"status": 200, "success": True})
 
-        return Response(
-            ApiHelpers.encrypt_context(context)
-            if self.request_content.get("encrypt") is True
-            else context,
-        )
+        return self.respond(status.HTTP_200_OK)
 
     def post(self, request):
         if self.transactional:
             with transaction.atomic():
-                return self.process(request)
+                return self.process()
 
-        return self.process(request)
+        return self.process()
 
 
 class CustomExportView(CustomAPIView):
@@ -911,15 +877,19 @@ class BasicPasswordAuth(CustomAPIView):
     model = None
     model_serializer = None
 
+    def __init__(self, *args, **kwargs):
+        self.context = ApiContext.get()
+        self.request_data = {}
+
+        super().__init__(*args, **kwargs)
+
     def _auth_method(self, username, password):
         raise NotImplemented()
 
-    def hook_context(self, context):
+    def hook_context(self):
         pass
 
-    def process(self, request):
-        context = ApiContext.auth()
-
+    def process(self):
         self.get_rest_request_content()
         self.get_request_content_data()
         self.get_rest_content_flags()
@@ -940,7 +910,7 @@ class BasicPasswordAuth(CustomAPIView):
         except:
             pass
 
-        context.update(
+        self.context.update(
             {
                 "success": True,
                 "status": 200,
@@ -965,14 +935,12 @@ class BasicPasswordAuth(CustomAPIView):
             }
         )
 
-        self.hook_context(context)
+        self.hook_context()
 
-        return Response(
-            context,
-        )
+        return self.respond(status.HTTP_200_OK)
 
     def post(self, request):
-        return self.process(request)
+        return self.process()
 
 
 class BasicTokenRefresh(CustomAPIView):
@@ -989,8 +957,7 @@ class BasicTokenRefresh(CustomAPIView):
     def hook_context(self, context):
         pass
 
-    def handler(self, request, context):
-        from django.utils import timezone
+    def handler(self):
 
         refresh_token = self.request_data.get("refresh_token")
 
@@ -1009,7 +976,7 @@ class BasicTokenRefresh(CustomAPIView):
         if token.is_access_token_expired:
             token.regenerate()
 
-        context.update(
+        self.context.update(
             {
                 "result": {
                     "token": self.model_serializer(
@@ -1024,26 +991,19 @@ class BasicTokenRefresh(CustomAPIView):
             }
         )
 
-        self.hook_context(context)
+        self.hook_context()
 
-        return request, context
-
-    def process(self, request):
-        context = ApiContext.get()
+    def process(self):
 
         self.get_rest_request_content()
         self.get_request_content_data()
         self.get_rest_content_flags()
 
-        request, context = self.handler(request, context)
+        self.handler()
 
-        context.update({"success": True})
+        self.context.update({"success": True})
 
-        return Response(
-            ApiHelpers.encrypt_context(context)
-            if self.request_content.get("encrypt") is True
-            else context,
-        )
+        return self.respond(status.HTTP_200_OK)
 
     def post(self, request):
-        return self.process(request)
+        return self.process()
