@@ -714,7 +714,7 @@ class CustomDeleteView(CustomAPIView):
     renderer_classes = [JSONRenderer]
 
     def __init__(self, *args, **kwargs):
-        self.context = ApiContext.delete()
+        self.context = ApiContext.remove()
         self.request_data = {}
 
         super().__init__(*args, **kwargs)
