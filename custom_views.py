@@ -1,7 +1,7 @@
 import traceback
 
 import django
-from django.db import models
+from django.db import models, transaction
 from django.http import HttpResponse
 from django.db.models import Q
 
@@ -23,6 +23,8 @@ from .throttles import BasicPasswordAuthThrottle, BasicTokenRefreshThrottle
 
 
 class CustomAPIView(APIView):
+    transactional = True
+
     object_class = None
     return_serializer_class = None
     user_serializer = None
@@ -124,68 +126,6 @@ class CustomAPIView(APIView):
         :return:
         """
         return self.parse_filter(self.request_content.get("filter", None))
-
-    @staticmethod
-    def generate_enhanced_filters(request_filter=None):
-        """
-        :param request_filter:
-        :return generated filter expression:
-        """
-        generated_filter = []
-
-        for i, re_filter in enumerate(request_filter):
-            op = "&"
-            open_group = ""
-            close_group = ""
-
-            #  Remove any characters not allowed in variables
-            for key in re_filter["expr"]:
-                if isinstance(re_filter["expr"][key], str):
-                    clean_val = str(
-                        re.sub(r"([^A-z0-9\- ]*)", "", str(re_filter["expr"][key]))
-                    )
-
-                else:
-                    clean_val = re_filter["expr"][key]
-
-                clean_key = re.sub(r"([^A-z0-9\-]*)", "", key)
-                break
-
-            if "open" in re_filter:
-                open_group = "("
-
-            elif "close" in re_filter:
-                close_group = ")"
-
-            if i > 0:
-
-                if "operator" in re_filter:
-                    if re_filter["operator"] == "or":
-                        op = "|"
-
-                    elif re_filter["operator"] == "and":
-                        op = "&"
-
-                    else:
-                        raise ApiValueError("unknown operator")
-
-                    generated_filter.append(op)
-                    generated_filter.append(
-                        "%sQ(%s='%s')%s"
-                        % (open_group, clean_key, clean_val, close_group)
-                    )
-
-                else:
-                    raise ApiValueError("Filter operator not provided")
-
-            else:
-                generated_filter.append(
-                    "%sQ(%s='%s')%s" % (open_group, clean_key, clean_val, close_group)
-                )
-
-        generated_filter = " ".join(generated_filter)
-
-        return ApiHelpers.eval_expr(generated_filter) if generated_filter else None
 
     def get_rest_content_order(self):
         """
@@ -345,6 +285,10 @@ class CustomListView(CustomAPIView):
         )
 
     def post(self, request):
+        if self.transactional:
+            with transaction.atomic():
+                return self.process(request)
+
         return self.process(request)
 
 
@@ -428,6 +372,10 @@ class CustomValueListView(CustomAPIView):
         )
 
     def post(self, request):
+        if self.transactional:
+            with transaction.atomic():
+                return self.process(request)
+
         return self.process(request)
 
 
@@ -443,12 +391,16 @@ class CustomGetView(CustomAPIView):
         if self.request_filter:
             if isinstance(self.request_filter, dict):
                 try:
-                    obj = self.object_class.objects.get(**self.request_filter)
+                    obj = self.annotate_queryset(self.object_class.objects).get(
+                        **self.request_filter
+                    )
                 except self.object_class.DoesNotExist:
                     raise ApiObjectNotFound()
             elif isinstance(self.request_filter, Q):
                 try:
-                    obj = self.object_class.objects.get(self.request_filter)
+                    obj = self.annotate_queryset(self.object_class.objects).get(
+                        self.request_filter
+                    )
                 except self.object_class.DoesNotExist:
                     raise ApiObjectNotFound()
             else:
@@ -532,6 +484,10 @@ class CustomGetView(CustomAPIView):
         )
 
     def post(self, request):
+        if self.transactional:
+            with transaction.atomic():
+                return self.process(request)
+
         return self.process(request)
 
 
@@ -562,7 +518,19 @@ class CustomCreateView(CustomAPIView):
         if not serializer.is_valid():
             if ApiSettings.DEBUG:
                 print(serializer.errors)
-            raise ApiSerializerInvalid()
+
+            field = ApiHelpers.list_get(list(serializer.errors.keys()), 0, None)
+            if not field:
+                raise ApiSerializerInvalid()
+
+            err_type = ApiHelpers.list_get(serializer.errors.get(field), 0, None)
+            if not err_type:
+                raise ApiSerializerInvalid()
+
+            raise ApiSerializerInvalid(
+                code="%s%s"
+                % (ApiSerializerInvalid.default_code, "%s%s" % (field, err_type.code))
+            )
 
         tmp_object = self.object_class(**serializer.validated_data)
         self.hook_before_creation(tmp_object)
@@ -633,6 +601,10 @@ class CustomCreateView(CustomAPIView):
         return self.process(request)
 
     def post(self, request):
+        if self.transactional:
+            with transaction.atomic():
+                return self.process(request)
+
         return self.process(request)
 
 
@@ -753,6 +725,10 @@ class CustomUpdateView(CustomAPIView):
         )
 
     def patch(self, request):
+        if self.transactional:
+            with transaction.atomic():
+                return self.process(request)
+
         return self.process(request)
 
 
@@ -837,6 +813,8 @@ class CustomDeleteView(CustomAPIView):
             request, context = self.handler(request, context)
         except django.db.models.deletion.ProtectedError as e:
             raise ApiDeleteProtectedError()
+        except django.db.utils.IntegrityError as e:
+            raise ApiDeleteIntegrityError()
         except Exception as e:
             self.pre_handle_exception(e)
 
@@ -851,6 +829,10 @@ class CustomDeleteView(CustomAPIView):
         )
 
     def post(self, request):
+        if self.transactional:
+            with transaction.atomic():
+                return self.process(request)
+
         return self.process(request)
 
 
@@ -945,21 +927,18 @@ class BasicPasswordAuth(CustomAPIView):
         if "username" not in self.request_data or "password" not in self.request_data:
             raise ApiAuthUsernameOrPasswordNotProvided()
 
-        user = self._auth_method(
+        user, token = self._auth_method(
             username=self.request_data["username"],
             password=self.request_data["password"],
         )
-        user_ip = ApiHelpers.get_client_ip(request)
-        user_user_agent = ApiHelpers.get_client_user_agent(request)
-
-        if not user:
-            raise ApiAuthFailed()
 
         self.request.user = user
 
-        token = self.model.objects.create(
-            user=user, ip_addr=user_ip, user_agent=user_user_agent
-        )
+        try:
+            # Delete expired tokens
+            self.model.delete_expired(user)
+        except:
+            pass
 
         context.update(
             {

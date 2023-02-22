@@ -23,6 +23,11 @@ class ApiDeleteProtectedError(APIException):
     default_code = "api_delete_protected_error"
 
 
+class ApiDeleteIntegrityError(APIException):
+    status_code = status.HTTP_409_CONFLICT
+    default_code = "api_delete_integrity_error"
+
+
 class ApiSerializerActionNotProvidedError(APIException):
     status_code = status.HTTP_409_CONFLICT
     default_code = "api_serializer_action_not_provided_error"
@@ -58,6 +63,12 @@ class ApiAuthInvalid(APIException):
     default_code = "api_auth_invalid"
 
 
+class ApiAuthUserNotActive(APIException):
+    status_code = status.HTTP_401_UNAUTHORIZED
+    default_detail = "ApiAuthUserNotActive"
+    default_code = "api_auth_user_not_active"
+
+
 class ApiExpiringTokenNotFound(APIException):
     status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
     default_detail = "ApiExpiringTokenNotFound"
@@ -77,13 +88,13 @@ class ApiExpiringTokenIsExpired(APIException):
 
 
 class ApiExpiringRefreshTokenIsExpired(APIException):
-    status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+    status_code = status.HTTP_401_UNAUTHORIZED
     default_detail = "ApiExpiringRefreshTokenIsExpired"
     default_code = "api_expiring_refresh_token_is_expired"
 
 
 class ApiSerializerInvalid(APIException):
-    status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+    status_code = status.HTTP_409_CONFLICT
     default_detail = "ApiSerializerInvalid"
     default_code = "api_serializer_invalid"
 

@@ -1,12 +1,10 @@
-import binascii
-import os
-
 from django.conf import settings
 from django.db import models
 from django.utils import timezone
 
 from .settings import custom_settings
 from ..models import ApiWrapperModel
+from django.utils.crypto import get_random_string
 
 
 def is_time_expired(time) -> bool:
@@ -14,11 +12,7 @@ def is_time_expired(time) -> bool:
 
 
 def generate_key():
-    return str(
-        binascii.hexlify(os.urandom(custom_settings.EXPIRING_TOKEN_LENGTH)).decode()[
-            0 : custom_settings.EXPIRING_TOKEN_LENGTH
-        ]
-    )
+    return str(get_random_string(custom_settings.EXPIRING_TOKEN_LENGTH))
 
 
 def get_default_access_token_expiry():
@@ -40,29 +34,32 @@ def get_default_refresh_token_validity():
 class ExpiringToken(ApiWrapperModel):
     class Meta:
         abstract = True
-        db_table = "auth_expiry_tokens"
-        verbose_name = "Token"
-        verbose_name_plural = "Tokens"
-
-    access_token = models.CharField(default=generate_key, max_length=254, unique=True)
-    access_token_expires = models.DateTimeField(default=get_default_access_token_expiry)
-    access_token_valid_until = models.DateTimeField(
-        default=get_default_access_token_validity
-    )
-
-    refresh_token = models.CharField(default=generate_key, max_length=254)
-    refresh_token_expires = models.DateTimeField(
-        default=get_default_refresh_token_expiry
-    )
-    refresh_token_valid_until = models.DateTimeField(
-        default=get_default_refresh_token_validity
-    )
 
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         related_name="auth_tokens",
         on_delete=models.CASCADE,
         verbose_name="User",
+    )
+
+    access_token = models.CharField(
+        default=generate_key,
+        max_length=custom_settings.EXPIRING_TOKEN_LENGTH,
+        unique=True,
+    )
+    access_token_expires = models.DateTimeField(default=get_default_access_token_expiry)
+    access_token_valid_until = models.DateTimeField(
+        default=get_default_access_token_validity
+    )
+
+    refresh_token = models.CharField(
+        default=generate_key, max_length=custom_settings.EXPIRING_TOKEN_LENGTH
+    )
+    refresh_token_expires = models.DateTimeField(
+        default=get_default_refresh_token_expiry
+    )
+    refresh_token_valid_until = models.DateTimeField(
+        default=get_default_refresh_token_validity
     )
 
     ip_addr = models.GenericIPAddressField(default=None, null=True)
