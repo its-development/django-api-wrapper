@@ -44,9 +44,7 @@ class CustomAPIView(APIView):
 
     def respond(self, http_code=status.HTTP_200_OK):
         return Response(
-            ApiHelpers.encrypt_context(self.context)
-            if self.request_content.get("encrypt") is True
-            else self.context,
+            ApiHelpers.encrypt_context(self.context) if self.request_content.get("encrypt") is True else self.context,
             status=http_code,
         )
 
@@ -233,9 +231,7 @@ class CustomListView(CustomAPIView):
             self.annotate_queryset(self.object_class.objects),
             self.request_filter,
         )
-        objects = objects.order_by(
-            *ApiHelpers.eval_expr("(%s)" % (", ".join(self.request_order)))
-        )
+        objects = objects.order_by(*ApiHelpers.eval_expr("(%s)" % (", ".join(self.request_order))))
 
         return objects
 
@@ -288,9 +284,7 @@ class CustomListView(CustomAPIView):
                     "columns": self.return_serializer_class.get_accessible_fields(
                         self.request, self.check_serializer_field_permission
                     )
-                    if issubclass(
-                        self.return_serializer_class, ApiWrapperModelSerializer
-                    )
+                    if issubclass(self.return_serializer_class, ApiWrapperModelSerializer)
                     else [*self.return_serializer_class.Meta.fields],
                 }
             )
@@ -328,9 +322,7 @@ class CustomValueListView(CustomAPIView):
             self.object_class.objects,
             self.request_filter,
         )
-        objects = objects.order_by(
-            *ApiHelpers.eval_expr("(%s)" % (", ".join(self.request_order)))
-        )
+        objects = objects.order_by(*ApiHelpers.eval_expr("(%s)" % (", ".join(self.request_order))))
 
         return objects
 
@@ -346,10 +338,7 @@ class CustomValueListView(CustomAPIView):
         )
         paginator.update_context(self.context)
 
-        result_set = [
-            ApiHelpers.rgetattr(result, self.request_data.get("value"))
-            for result in result_set
-        ]
+        result_set = [ApiHelpers.rgetattr(result, self.request_data.get("value")) for result in result_set]
 
         self.context.update(
             {
@@ -403,16 +392,12 @@ class CustomGetView(CustomAPIView):
         if self.request_filter:
             if isinstance(self.request_filter, dict):
                 try:
-                    obj = self.annotate_queryset(self.object_class.objects).get(
-                        **self.request_filter
-                    )
+                    obj = self.annotate_queryset(self.object_class.objects).get(**self.request_filter)
                 except self.object_class.DoesNotExist:
                     raise ApiObjectNotFound()
             elif isinstance(self.request_filter, Q):
                 try:
-                    obj = self.annotate_queryset(self.object_class.objects).get(
-                        self.request_filter
-                    )
+                    obj = self.annotate_queryset(self.object_class.objects).get(self.request_filter)
                 except self.object_class.DoesNotExist:
                     raise ApiObjectNotFound()
             else:
@@ -432,9 +417,7 @@ class CustomGetView(CustomAPIView):
         obj = self.get_queryset()
 
         if self.check_object_permission and not obj.check_view_perm(self.request):
-            err_msg = "%s: You don't have permission to view this object" % (
-                obj.__class__.__name__
-            )
+            err_msg = "%s: You don't have permission to view this object" % (obj.__class__.__name__)
             raise ApiPermissionError(err_msg)
 
         self.context.update(
@@ -472,9 +455,7 @@ class CustomGetView(CustomAPIView):
                     "fields": self.return_serializer_class.get_accessible_fields(
                         self.request, self.check_serializer_field_permission
                     )
-                    if issubclass(
-                        self.return_serializer_class, ApiWrapperModelSerializer
-                    )
+                    if issubclass(self.return_serializer_class, ApiWrapperModelSerializer)
                     else [*self.return_serializer_class.Meta.fields],
                 }
             )
@@ -564,9 +545,7 @@ class CustomCreateView(CustomAPIView):
                     "fields": self.return_serializer_class.get_accessible_fields(
                         self.request, self.check_serializer_field_permission
                     )
-                    if issubclass(
-                        self.return_serializer_class, ApiWrapperModelSerializer
-                    )
+                    if issubclass(self.return_serializer_class, ApiWrapperModelSerializer)
                     else [*self.return_serializer_class.Meta.fields],
                 }
             )
@@ -615,20 +594,14 @@ class CustomUpdateView(CustomAPIView):
         if "id" not in self.request_data and "pk" not in self.request_data:
             raise ApiContentDataPkNotProvided()
 
-        pk = (
-            self.request_data.get("id")
-            if self.request_data.get("id")
-            else self.request_data.get("pk")
-        )
+        pk = self.request_data.get("id") if self.request_data.get("id") else self.request_data.get("pk")
 
         object_to_update = self.object_class.objects.get(pk=pk)
 
         if not object_to_update:
             raise ApiObjectNotFound()
 
-        if self.check_object_permission and not object_to_update.check_change_perm(
-            self.request
-        ):
+        if self.check_object_permission and not object_to_update.check_change_perm(self.request):
             raise ApiPermissionError("Object permission denied.")
 
         self.hook_before_update(object_to_update)
@@ -682,9 +655,7 @@ class CustomUpdateView(CustomAPIView):
                     "fields": self.return_serializer_class.get_accessible_fields(
                         self.request, self.check_serializer_field_permission
                     )
-                    if issubclass(
-                        self.return_serializer_class, ApiWrapperModelSerializer
-                    )
+                    if issubclass(self.return_serializer_class, ApiWrapperModelSerializer)
                     else [*self.return_serializer_class.Meta.fields],
                 }
             )
@@ -735,11 +706,7 @@ class CustomDeleteView(CustomAPIView):
         ):
             raise ApiContentDataPkNotProvided()
 
-        pk = (
-            self.request_data.get("id")
-            if self.request_data.get("id")
-            else self.request_data.get("pk")
-        )
+        pk = self.request_data.get("id") if self.request_data.get("id") else self.request_data.get("pk")
 
         pk_set = (
             self.request_data.get("id_set", [])
@@ -951,6 +918,12 @@ class BasicTokenRefresh(CustomAPIView):
     model = None
     model_serializer = None
 
+    def __init__(self):
+        self.context = ApiContext.get()
+        self.request_data = {}
+
+        super().__init__()
+
     def _auth_method(self, username, password):
         raise NotImplemented()
 
@@ -958,7 +931,6 @@ class BasicTokenRefresh(CustomAPIView):
         pass
 
     def handler(self):
-
         refresh_token = self.request_data.get("refresh_token")
 
         if not refresh_token:
