@@ -130,6 +130,9 @@ class ApiHelpers:
         class PermissionRequired(permissions.BasePermission):
             def has_permission(self, request, view):
 
+                if not request.user:
+                    raise ApiAuthInvalid()
+
                 if not request.user.has_perm(permission_name):
 
                     if raise_exception:
