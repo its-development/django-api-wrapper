@@ -70,6 +70,10 @@ def eval_(node):
 
 
 class ApiHelpers:
+    class AllowMissingDict(dict):
+        def __missing__(self, key):
+            return "{" + key + "}"
+
     @staticmethod
     def parse_string(val, template_vars):
         # Template: [% var1 %]
