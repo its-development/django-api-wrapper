@@ -33,6 +33,9 @@ class ObtainJWT(CustomAPIView):
             }
         )
 
+    def hook_context(self):
+        pass
+
     def handler(self):
         username = self.request_data.get("username", None)
         password = self.request_data.get("password", None)
@@ -53,6 +56,8 @@ class ObtainJWT(CustomAPIView):
                 },
             }
         )
+
+        self.hook_context()
 
     def process(self):
         self.get_rest_request_content()
