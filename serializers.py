@@ -81,7 +81,9 @@ class ApiWrapperModelSerializer(serializers.ModelSerializer):
         """
         for field_name, field_value in value.items():
             if isinstance(field_value, (ApiWrapperModel, models.Model)):
-                if not field_value.check_view_perm(self.context.get("request")):
+                if self.context.get(
+                    "check_field_permission", False
+                ) and not field_value.check_view_perm(self.context.get("request")):
                     raise ApiPermissionError()
 
         super().run_validators(value)
