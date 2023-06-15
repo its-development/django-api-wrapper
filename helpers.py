@@ -5,6 +5,7 @@ import os
 import re
 from datetime import timedelta
 
+from django.contrib.auth.models import AnonymousUser
 from django.db.models import Q
 from django.db.models.functions import Lower, Upper
 from rest_framework import permissions
@@ -134,11 +135,10 @@ class ApiHelpers:
         class PermissionRequired(permissions.BasePermission):
             def has_permission(self, request, view):
 
-                if not request.user:
+                if not request.user or isinstance(request.user, AnonymousUser):
                     raise ApiAuthInvalid()
 
                 if not request.user.has_perm(permission_name):
-
                     if raise_exception:
                         raise exceptions.PermissionDenied(
                             "Permission denied. Required: " + permission_name
