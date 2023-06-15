@@ -553,6 +553,9 @@ class CustomCreateView(CustomAPIView):
         )
 
     def process(self):
+        if hasattr(self, "get_serializer_class"):
+            self.serializer_class = self.get_serializer_class()
+
         self.get_rest_request_content()
         self.get_rest_content_flags()
         self.get_request_content_data()
@@ -671,6 +674,9 @@ class CustomUpdateView(CustomAPIView):
         )
 
     def process(self):
+        if hasattr(self, "get_serializer_class"):
+            self.serializer_class = self.get_serializer_class()
+
         self.get_rest_request_content()
         self.get_request_content_data()
         self.get_rest_content_flags()
@@ -896,6 +902,9 @@ class BasicPasswordAuth(CustomAPIView):
         pass
 
     def process(self):
+        if hasattr(self, "get_serializer_class"):
+            self.serializer_class = self.get_serializer_class()
+
         self.get_rest_request_content()
         self.get_request_content_data()
         self.get_rest_content_flags()
@@ -1005,6 +1014,8 @@ class BasicTokenRefresh(CustomAPIView):
         self.hook_context()
 
     def process(self):
+        if hasattr(self, "get_serializer_class"):
+            self.serializer_class = self.get_serializer_class()
 
         self.get_rest_request_content()
         self.get_request_content_data()
