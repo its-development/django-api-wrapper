@@ -75,6 +75,10 @@ class ApiHelpers:
         def __missing__(self, key):
             return "{" + key + "}"
 
+    class NoneToEmptyStringDict(dict):
+        def __getitem__(self, key):
+            return "" if super().__getitem__(key) is None else super().__getitem__(key)
+
     @staticmethod
     def parse_string(val, template_vars):
         # Template: [% var1 %]
