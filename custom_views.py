@@ -184,14 +184,12 @@ class CustomAPIView(APIView):
         return [*self.request_content.get("order"), ""]
 
     def get_rest_content_pagination(self):
-
         if "pagination" not in self.request_content:
             raise ApiContentPaginationNotProvided()
 
         return self.request_content.get("pagination")
 
     def filter_queryset(self, manager, fil=None):
-
         if fil:
             if isinstance(fil, dict):
                 objects = manager.filter(**fil)
@@ -620,7 +618,6 @@ class CustomUpdateView(CustomAPIView):
         pass
 
     def handler(self):
-
         if "id" not in self.request_data and "pk" not in self.request_data:
             raise ApiContentDataPkNotProvided()
 
@@ -630,7 +627,7 @@ class CustomUpdateView(CustomAPIView):
             else self.request_data.get("pk")
         )
 
-        object_to_update = self.object_class.objects.get(pk=pk)
+        object_to_update = self.object_class.objects.select_for_update().get(pk=pk)
 
         if not object_to_update:
             raise ApiObjectNotFound()
@@ -738,7 +735,6 @@ class CustomDeleteView(CustomAPIView):
         pass
 
     def handler(self):
-
         if (
             "id" not in self.request_data
             and "pk" not in self.request_data
