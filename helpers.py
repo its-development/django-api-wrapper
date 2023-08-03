@@ -113,7 +113,6 @@ class ApiHelpers:
 
     @staticmethod
     def get_client_ip(request):
-
         x_forwarded_for = request.META.get("HTTP_X_FORWARDED_FOR")
 
         if x_forwarded_for:
@@ -126,7 +125,6 @@ class ApiHelpers:
 
     @staticmethod
     def get_client_user_agent(request):
-
         user_agent = request.META.get("HTTP_USER_AGENT")
 
         if not user_agent:
@@ -138,7 +136,6 @@ class ApiHelpers:
     def permission_required(permission_name, raise_exception=False):
         class PermissionRequired(permissions.BasePermission):
             def has_permission(self, request, view):
-
                 if not request.user or isinstance(request.user, AnonymousUser):
                     raise ApiAuthInvalid()
 
@@ -206,3 +203,11 @@ class ApiHelpers:
         l = len(target)
         target.add(item)
         return l != len(target)
+
+    @staticmethod
+    def contains_keys(target, keys):
+        return all(key in target for key in keys)
+
+    @staticmethod
+    def contains_any_keys(target, keys):
+        return any(key in target for key in keys)
