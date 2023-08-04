@@ -243,6 +243,9 @@ class CustomListView(CustomAPIView):
 
         return objects
 
+    def hook_before_serializer(self, result_set):
+        return
+
     def handler(self):
         objects = self.get_queryset()
 
@@ -255,6 +258,8 @@ class CustomListView(CustomAPIView):
         )
 
         paginator.update_context(self.context)
+
+        self.hook_before_serializer(result_set)
 
         result_set = self.return_serializer_class(
             result_set,
@@ -432,6 +437,9 @@ class CustomGetView(CustomAPIView):
 
         return obj
 
+    def hook_before_serializer(self, obj):
+        return
+
     def handler(self):
         obj = self.get_queryset()
 
@@ -440,6 +448,8 @@ class CustomGetView(CustomAPIView):
                 obj.__class__.__name__
             )
             raise ApiPermissionError(err_msg)
+
+        self.hook_before_serializer(obj)
 
         self.context.update(
             {
