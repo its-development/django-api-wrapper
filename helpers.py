@@ -5,6 +5,7 @@ import os
 import re
 from datetime import timedelta
 
+from django.contrib.auth.models import AnonymousUser
 from django.db.models import Q
 from django.db.models.functions import Lower, Upper
 from rest_framework import permissions
@@ -70,6 +71,14 @@ def eval_(node):
 
 
 class ApiHelpers:
+    class AllowMissingDict(dict):
+        def __missing__(self, key):
+            return "{" + key + "}"
+
+    class NoneToEmptyStringDict(dict):
+        def __getitem__(self, key):
+            return "" if super().__getitem__(key) is None else super().__getitem__(key)
+
     @staticmethod
     def parse_string(val, template_vars):
         # Template: [% var1 %]
@@ -104,7 +113,6 @@ class ApiHelpers:
 
     @staticmethod
     def get_client_ip(request):
-
         x_forwarded_for = request.META.get("HTTP_X_FORWARDED_FOR")
 
         if x_forwarded_for:
@@ -117,7 +125,6 @@ class ApiHelpers:
 
     @staticmethod
     def get_client_user_agent(request):
-
         user_agent = request.META.get("HTTP_USER_AGENT")
 
         if not user_agent:
@@ -129,9 +136,10 @@ class ApiHelpers:
     def permission_required(permission_name, raise_exception=False):
         class PermissionRequired(permissions.BasePermission):
             def has_permission(self, request, view):
+                if not request.user or isinstance(request.user, AnonymousUser):
+                    raise ApiAuthInvalid()
 
                 if not request.user.has_perm(permission_name):
-
                     if raise_exception:
                         raise exceptions.PermissionDenied(
                             "Permission denied. Required: " + permission_name
@@ -195,3 +203,11 @@ class ApiHelpers:
         l = len(target)
         target.add(item)
         return l != len(target)
+
+    @staticmethod
+    def contains_keys(target, keys):
+        return all(key in target for key in keys)
+
+    @staticmethod
+    def contains_any_keys(target, keys):
+        return any(key in target for key in keys)

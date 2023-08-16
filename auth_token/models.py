@@ -88,9 +88,9 @@ class ExpiringToken(ApiWrapperModel):
         if not self.user:
             raise ValueError("User missing")
 
-        user_active_sessions = self.__class__.objects.filter(user=self.user)
-        if user_active_sessions.count() >= custom_settings.EXPIRING_TOKEN_MAX_SESSIONS:
-            user_active_sessions.order_by("created_at").last().delete()
+        # user_active_sessions = self.__class__.objects.filter(user=self.user)
+        # if user_active_sessions.count() >= custom_settings.EXPIRING_TOKEN_MAX_SESSIONS:
+        #     user_active_sessions.order_by("created_at").last().delete()
 
         if not self.access_token:
             self.access_token = generate_key()
