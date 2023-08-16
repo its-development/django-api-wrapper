@@ -5,6 +5,7 @@ import os
 import re
 from datetime import timedelta
 
+from django.contrib.auth.models import AnonymousUser
 from django.db.models import Q
 from django.db.models.functions import Lower, Upper
 from rest_framework import permissions
@@ -45,6 +46,14 @@ def eval_(node):
                 return Q(**{node.keywords[0].arg: eval_(node.keywords[0].value)})
             elif isinstance(node.keywords[0].value, ast.List):
                 return Q(**{node.keywords[0].arg: eval_(node.keywords[0].value)})
+            elif isinstance(node.keywords[0].value, ast.BinOp):
+                return Q(**{node.keywords[0].arg: eval_(node.keywords[0].value)})
+            elif isinstance(node.keywords[0].value, ast.UnaryOp):
+                return Q(**{node.keywords[0].arg: eval_(node.keywords[0].value)})
+            else:
+                raise ApiValueError(
+                    "eval_ does not support this function. Hi exploiter :)"
+                )
         elif node.func.id == "Lower":
             return Lower(node.args[0].value)
         elif node.func.id == "Upper":
@@ -62,15 +71,24 @@ def eval_(node):
 
 
 class ApiHelpers:
+    class AllowMissingDict(dict):
+        def __missing__(self, key):
+            return "{" + key + "}"
+
+    class NoneToEmptyStringDict(dict):
+        def __getitem__(self, key):
+            return "" if super().__getitem__(key) is None else super().__getitem__(key)
+
     @staticmethod
     def parse_string(val, template_vars):
+        # Template: [% var1 %]
         res = val
 
-        matches = re.finditer(r"\[(.*?)\]", val)
+        matches = re.finditer(r"\[(.*?)\]", str(val))
 
         for match in matches:
             var = re.search("(?<=\[%).+?(?=\%])", match.group(0)).group(0)
-            res = res.replace(match.group(0), template_vars[var])
+            res = res.replace(match.group(0), str(template_vars[var]))
 
         return res
 
@@ -95,7 +113,6 @@ class ApiHelpers:
 
     @staticmethod
     def get_client_ip(request):
-
         x_forwarded_for = request.META.get("HTTP_X_FORWARDED_FOR")
 
         if x_forwarded_for:
@@ -108,7 +125,6 @@ class ApiHelpers:
 
     @staticmethod
     def get_client_user_agent(request):
-
         user_agent = request.META.get("HTTP_USER_AGENT")
 
         if not user_agent:
@@ -120,9 +136,10 @@ class ApiHelpers:
     def permission_required(permission_name, raise_exception=False):
         class PermissionRequired(permissions.BasePermission):
             def has_permission(self, request, view):
+                if not request.user or isinstance(request.user, AnonymousUser):
+                    raise ApiAuthInvalid()
 
                 if not request.user.has_perm(permission_name):
-
                     if raise_exception:
                         raise exceptions.PermissionDenied(
                             "Permission denied. Required: " + permission_name
@@ -155,3 +172,42 @@ class ApiHelpers:
             return l[i]
         except IndexError:
             return default
+
+    @staticmethod
+    def generate_model_field_permissions(permission, content_type, model):
+        for action in ["add", "change", "view"]:
+            for field in model._meta.get_fields():
+                perm, _ = permission.objects.get_or_create(
+                    content_type=content_type.objects.get(
+                        app_label=model._meta.app_label,
+                        model=model._meta.model_name,
+                    ),
+                    codename="%s_%s_%s"
+                    % (
+                        action,
+                        model._meta.model_name,
+                        field.name,
+                    ),
+                )
+                perm.name = "Can %s %s.%s" % (
+                    action,
+                    model._meta.model_name,
+                    field.name,
+                )
+                perm.save()
+
+                print(perm.codename)
+
+    @staticmethod
+    def add_set(target, item):
+        l = len(target)
+        target.add(item)
+        return l != len(target)
+
+    @staticmethod
+    def contains_keys(target, keys):
+        return all(key in target for key in keys)
+
+    @staticmethod
+    def contains_any_keys(target, keys):
+        return any(key in target for key in keys)

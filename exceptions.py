@@ -6,6 +6,33 @@ class ApiValueError(APIException):
     status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
 
 
+class ApiEmptyRequestError(APIException):
+    status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+
+
+class ApiMethodNotSupportedError(APIException):
+    status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+
+
+class ApiValueConflictError(APIException):
+    status_code = status.HTTP_409_CONFLICT
+
+
+class ApiDeleteProtectedError(APIException):
+    status_code = status.HTTP_409_CONFLICT
+    default_code = "api_delete_protected_error"
+
+
+class ApiDeleteIntegrityError(APIException):
+    status_code = status.HTTP_409_CONFLICT
+    default_code = "api_delete_integrity_error"
+
+
+class ApiSerializerActionNotProvidedError(APIException):
+    status_code = status.HTTP_409_CONFLICT
+    default_code = "api_serializer_action_not_provided_error"
+
+
 class ApiPermissionError(APIException):
     status_code = status.HTTP_403_FORBIDDEN
 
@@ -36,10 +63,22 @@ class ApiAuthInvalid(APIException):
     default_code = "api_auth_invalid"
 
 
+class ApiAuthUserNotActive(APIException):
+    status_code = status.HTTP_401_UNAUTHORIZED
+    default_detail = "ApiAuthUserNotActive"
+    default_code = "api_auth_user_not_active"
+
+
 class ApiExpiringTokenNotFound(APIException):
     status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
     default_detail = "ApiExpiringTokenNotFound"
     default_code = "api_expiring_token_not_found"
+
+
+class ApiExpiringRefreshTokenNotFound(APIException):
+    status_code = status.HTTP_401_UNAUTHORIZED
+    default_detail = "ApiExpiringRefreshTokenNotFound"
+    default_code = "api_expiring_refresh_token_not_found"
 
 
 class ApiExpiringTokenIsExpired(APIException):
@@ -48,8 +87,14 @@ class ApiExpiringTokenIsExpired(APIException):
     default_code = "api_expiring_token_is_expired"
 
 
+class ApiExpiringRefreshTokenIsExpired(APIException):
+    status_code = status.HTTP_401_UNAUTHORIZED
+    default_detail = "ApiExpiringRefreshTokenIsExpired"
+    default_code = "api_expiring_refresh_token_is_expired"
+
+
 class ApiSerializerInvalid(APIException):
-    status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+    status_code = status.HTTP_409_CONFLICT
     default_detail = "ApiSerializerInvalid"
     default_code = "api_serializer_invalid"
 
@@ -97,7 +142,7 @@ class ApiContentDataPkNotProvided(APIException):
 
 
 class ApiObjectNotFound(APIException):
-    status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+    status_code = status.HTTP_404_NOT_FOUND
     default_detail = "ApiObjectNotFound"
     default_code = "api_object_not_found"
 

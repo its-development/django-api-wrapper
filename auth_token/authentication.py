@@ -14,15 +14,26 @@ class ExpiringTokenAuthentication(TokenAuthentication):
     model = None
     keyword = "token"
 
+    check_ip = True
+
     def authenticate(self, request):
-        user, token = super().authenticate(request)
+        """
+        Returns None to hand over to the next authentication class.
+        """
+        res = super().authenticate(request)
 
-        if not token:
-            raise ApiAuthFailed()
+        if not res:
+            return None
 
-        if not token.ip_addr or token.ip_addr != ApiHelpers.get_client_ip(request):
-            token.delete()
-            raise ApiValueError("IP missmatch")
+        user, token = res
+
+        if not user or not token:
+            return None
+
+        if self.check_ip:
+            if not token.ip_addr or token.ip_addr != ApiHelpers.get_client_ip(request):
+                token.delete()
+                raise ApiValueError("IP missmatch")
 
         return user, token
 
@@ -30,7 +41,7 @@ class ExpiringTokenAuthentication(TokenAuthentication):
         try:
             token = self.model.objects.get(access_token=key)
         except self.model.DoesNotExist:
-            raise ApiAuthInvalid()
+            return None
 
         if not token.user.is_active:
             raise AuthenticationFailed("User is not active")
