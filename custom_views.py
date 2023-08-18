@@ -261,15 +261,17 @@ class CustomListView(CustomAPIView):
 
         self.hook_before_serializer(result_set)
 
-        result_set = self.return_serializer_class(
-            result_set,
-            many=True,
-            context={
-                "request": self.request,
-                "check_field_permission": self.check_serializer_field_permission,
-                "action": "view",
-            },
-        ).data
+        result_set = [
+            self.return_serializer_class(
+                instance=result,
+                context={
+                    "request": self.request,
+                    "check_field_permission": self.check_serializer_field_permission,
+                    "action": "view",
+                },
+            ).data
+            for result in result_set
+        ]
 
         self.context.update(
             {
