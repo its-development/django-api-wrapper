@@ -17,6 +17,10 @@ class ApiWrapperModel(models.Model):
         base_manager_name = "objects"
         abstract = True
 
+    @property
+    def _reference_hash(self):
+        return f"{self.__class__.__name__}:{self.id}"
+
     def check_obj_perm(self, request):
         return False
 
