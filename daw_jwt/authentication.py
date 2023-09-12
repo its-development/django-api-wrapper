@@ -4,7 +4,7 @@ import traceback
 from django.contrib.auth import get_user_model
 from rest_framework.authentication import BaseAuthentication
 
-from api.cryptor import ApiCrypto
+from api.crypto import ApiCrypto
 from .handler import decode_jwt
 from ..exceptions import ApiAuthInvalid
 from ..helpers import ApiHelpers
@@ -27,7 +27,7 @@ class DAWJWTAuthentication(BaseAuthentication):
         if not user_id:
             return None
 
-        user_id = ApiCrypto.decode(bytes(user_id, "utf-8"))
+        user_id = ApiCrypto.decode(user_id)
 
         if self.check_ip:
             ip_addr = payload.get("ip_addr", None)

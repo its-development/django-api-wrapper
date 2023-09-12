@@ -17,9 +17,6 @@ from .helpers import ApiHelpers
 from .pagination import ApiPaginator
 from .context import ApiContext
 from .exceptions import *
-
-import csv
-
 from .throttles import BasicPasswordAuthThrottle, BasicTokenRefreshThrottle
 
 logger = logging.getLogger(os.environ.get("DJANGO_API_WRAPPER_LOGGER", "django"))
@@ -35,6 +32,7 @@ class CustomAPIView(APIView):
     enhanced_filters = False
     check_object_permission = True
     check_serializer_field_permission = True
+    encryption = False
     session_data = {}
 
     def __init__(self, *args, **kwargs):
@@ -49,7 +47,7 @@ class CustomAPIView(APIView):
     def respond(self, http_code=status.HTTP_200_OK):
         return Response(
             ApiHelpers.encrypt_context(self.context)
-            if self.request_content.get("encrypt") is True
+            if self.encryption
             else self.context,
             status=http_code,
         )
@@ -117,7 +115,6 @@ class CustomAPIView(APIView):
         :param request:
         :return request.data:
         """
-        content = {}
 
         if not self.request:
             raise ApiEmptyRequestError()
