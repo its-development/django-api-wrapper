@@ -105,6 +105,12 @@ class ApiContentDataNotProvided(APIException):
     default_code = "api_content_data_not_provided"
 
 
+class ApiContentDataFileNotProvided(APIException):
+    status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+    default_detail = "ApiContentDataFileNotProvided"
+    default_code = "api_content_file_not_provided"
+
+
 class ApiContentFilterNotProvided(APIException):
     status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
     default_detail = "ApiContentFilterNotProvided"

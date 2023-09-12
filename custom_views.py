@@ -1,11 +1,13 @@
+import json
+import csv
 import logging
 import os
 import traceback
 
-import django
-from django.db import models, transaction
-from django.http import HttpResponse
-from django.db.models import Q
+from django.db import transaction, IntegrityError, NotSupportedError
+from django.http import HttpResponse, FileResponse
+from django.db.models import Q, ProtectedError
+from rest_framework.parsers import MultiPartParser, FormParser
 
 from rest_framework.renderers import JSONRenderer
 from rest_framework.views import APIView
@@ -636,7 +638,10 @@ class CustomUpdateView(CustomAPIView):
             else self.request_data.get("pk")
         )
 
-        object_to_update = self.object_class.objects.select_for_update().get(pk=pk)
+        try:
+            object_to_update = self.object_class.objects.select_for_update().get(pk=pk)
+        except NotSupportedError:
+            object_to_update = self.object_class.objects.get(pk=pk)
 
         if not object_to_update:
             raise ApiObjectNotFound()
@@ -798,9 +803,9 @@ class CustomDeleteView(CustomAPIView):
 
         try:
             self.handler()
-        except django.db.models.deletion.ProtectedError as e:
+        except ProtectedError as e:
             raise ApiDeleteProtectedError()
-        except django.db.utils.IntegrityError as e:
+        except IntegrityError as e:
             raise ApiDeleteIntegrityError()
         except Exception as e:
             self.pre_handle_exception(e)
@@ -1033,4 +1038,135 @@ class BasicTokenRefresh(CustomAPIView):
         return self.respond(status.HTTP_200_OK)
 
     def post(self, request):
+        return self.process()
+
+
+class CustomFileUploadView(CustomAPIView):
+    parser_classes = [MultiPartParser, FormParser]
+
+    def __init__(self, *args, **kwargs):
+        self.context = ApiContext.create()
+        self.request_data = {}
+        super().__init__(*args, **kwargs)
+
+    def hook_file_instance(self, obj, file):
+        pass
+
+    def handler(self):
+        if "id" not in self.request_data and "pk" not in self.request_data:
+            raise ApiContentDataPkNotProvided()
+
+        pk = (
+            self.request_data.get("id")
+            if self.request_data.get("id")
+            else self.request_data.get("pk")
+        )
+
+        try:
+            model_instance = self.object_class.objects.select_for_update().get(pk=pk)
+        except NotSupportedError:
+            model_instance = self.object_class.objects.get(pk=pk)
+
+        if not model_instance.check_change_perm(self.request):
+            raise ApiPermissionError("Object permission denied.")
+
+        uploaded_file = self.request.FILES.get("uploaded_file")
+
+        if not uploaded_file:
+            raise ApiContentDataFileNotProvided()
+
+        self.hook_file_instance(model_instance, uploaded_file)
+
+        model_instance.save()
+
+        self.context.update(
+            {
+                "success": True,
+                "result": self.return_serializer_class(
+                    instance=model_instance,
+                    context={
+                        "request": self.request,
+                        "check_field_permission": self.check_serializer_field_permission,
+                        "action": "view",
+                    },
+                ).data,
+            }
+        )
+
+    def process(self):
+        try:
+            self.get_rest_request_content()
+            self.get_request_content_data()
+
+            if isinstance(self.request_data, str):
+                self.request_data = json.loads(self.request_data)
+
+            self.request_data = {**self.request_data, **self.request.FILES}
+            self.get_rest_content_flags()
+            self.handler()
+        except Exception as e:
+            self.pre_handle_exception(e)
+
+        return self.respond(status.HTTP_201_CREATED)
+
+    def post(self, request):
+        if self.transactional:
+            with transaction.atomic():
+                return self.process()
+
+        return self.process()
+
+
+class CustomFileDownloadView(CustomAPIView):
+    def __init__(self, *args, **kwargs):
+        self.request_data = {}
+        super().__init__(*args, **kwargs)
+
+    def get_file(self, obj):
+        # This method can be overridden to perform some action on the file instance before downloading
+        raise NotImplementedError()
+
+    def handler(self):
+        if "id" not in self.request_data and "pk" not in self.request_data:
+            raise ApiContentDataPkNotProvided()
+
+        pk = (
+            self.request_data.get("id")
+            if self.request_data.get("id")
+            else self.request_data.get("pk")
+        )
+
+        try:
+            model_instance = self.object_class.objects.select_for_update().get(pk=pk)
+        except NotSupportedError:
+            model_instance = self.object_class.objects.get(pk=pk)
+
+        if not model_instance.check_change_perm(self.request):
+            raise ApiPermissionError("Object permission denied.")
+
+        file_instance = self.get_file(model_instance)
+
+        if not file_instance:
+            raise ApiContentDataFileNotProvided()
+
+        return FileResponse(
+            file_instance, as_attachment=True, filename=file_instance.name
+        )
+
+    def process(self):
+        try:
+            self.get_rest_request_content()
+            self.get_request_content_data()
+
+            return self.handler()
+
+        except Exception as e:
+            self.pre_handle_exception(e)
+            return self.respond(status.HTTP_400_BAD_REQUEST)
+
+    def post(self, request):
+        if self.transactional:
+            with transaction.atomic():
+                return self.process()
+
         return self.process()
