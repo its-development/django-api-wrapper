@@ -18,7 +18,7 @@ class DAWJWTAuthentication(BaseAuthentication):
     check_ip = True
     check_user_agent = True
     request_header = "HTTP_AUTHORIZATION"
-    request_header_key = "token"
+    request_header_key = "Bearer"
     user_model = get_user_model()
 
     def get_user_from_payload(self, request, payload):
@@ -49,7 +49,7 @@ class DAWJWTAuthentication(BaseAuthentication):
 
         try:
             token = auth_header.split(" ")[1]
-            payload = decode_jwt(token)
+            payload = self.get_payload_from_token(token)
             user = self.get_user_from_payload(request, payload)
 
             return user, None
@@ -59,3 +59,6 @@ class DAWJWTAuthentication(BaseAuthentication):
             logging.getLogger("django").error(traceback.format_exc())
 
         raise ApiAuthInvalid()
+
+    def get_payload_from_token(self, token):
+        return decode_jwt(token)
