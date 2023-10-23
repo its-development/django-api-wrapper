@@ -5,6 +5,26 @@ from django.db import models
 from .manager import ApiWrapperModelManager, ApiWrapperUserManager
 
 
+class AnnotatedProperty(object):
+    """
+    Property for already annotated values, e.g. from a queryset. But it can also be used on instances.
+    """
+
+    def __init__(self, fget=None):
+        self.fget = fget
+
+    def __get__(self, obj, objtype=None):
+        if self.fget is None:
+            raise AttributeError("unreadable attribute")
+
+        # Check if the object's dictionary already has the attribute
+        if self.fget.__name__ in obj.__dict__:
+            return obj.__dict__[self.fget.__name__]
+
+        # If not, calculate it using fget
+        return self.fget(obj)
+
+
 class ApiWrapperModel(models.Model):
     objects = ApiWrapperModelManager()
 
