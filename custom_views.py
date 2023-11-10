@@ -733,6 +733,127 @@ class CustomChangeView(CustomUpdateView):
     pass
 
 
+class CustomBulkUpdateView(CustomAPIView):
+    renderer_classes = [JSONRenderer]
+
+    def __init__(self, *args, **kwargs):
+        self.context = ApiContext.update()
+        self.request_data = {}
+
+        super().__init__(*args, **kwargs)
+
+    def hook_before_update(self, obj, data):
+        pass
+
+    def hook_after_update(self, obj, data):
+        pass
+
+    def handler(self):
+        results = []
+        for item in self.request_data.get("items", []):
+            pk = item.get("id") if item.get("id") else item.get("pk")
+
+            try:
+                object_to_update = self.object_class.objects.select_for_update().get(
+                    pk=pk
+                )
+            except NotSupportedError:
+                object_to_update = self.object_class.objects.get(pk=pk)
+
+            if not object_to_update:
+                raise ApiObjectNotFound()
+
+            if self.check_object_permission and not object_to_update.check_change_perm(
+                self.request
+            ):
+                raise ApiPermissionError("Object permission denied.")
+
+            self.hook_before_update(object_to_update, item)
+
+            serializer = self.serializer_class(
+                instance=object_to_update,
+                data=self.request_data,
+                partial=True,
+                context={
+                    "request": self.request,
+                    "check_field_permission": self.check_serializer_field_permission,
+                    "action": "change",
+                },
+            )
+
+            if not serializer.is_valid():
+                self.handle_invalid_serializer(serializer)
+
+            updated_object = serializer.save()
+
+            self.hook_after_update(updated_object, item)
+
+            results.append(
+                self.return_serializer_class(
+                    instance=updated_object,
+                    context={
+                        "request": self.request,
+                        "check_field_permission": self.check_serializer_field_permission,
+                        "action": "change",
+                    },
+                ).data
+            )
+
+        self.context.update(
+            {
+                "results": results,
+            }
+        )
+
+    def process(self):
+        if hasattr(self, "get_serializer_class"):
+            self.serializer_class = self.get_serializer_class()
+
+        self.get_rest_request_content()
+        self.get_request_content_data()
+        self.get_rest_content_flags()
+
+        try:
+            self.handler()
+        except Exception as e:
+            self.pre_handle_exception(e)
+
+        self.add_user_to_context()
+
+        if self.return_serializer_class:
+            self.context.update(
+                {
+                    "fields": self.return_serializer_class.get_accessible_fields(
+                        self.request, self.check_serializer_field_permission
+                    )
+                    if issubclass(
+                        self.return_serializer_class, ApiWrapperModelSerializer
+                    )
+                    else [*self.return_serializer_class.Meta.fields],
+                }
+            )
+
+        self.context.update(
+            {
+                "success": True,
+            }
+        )
+
+        return self.respond(status.HTTP_200_OK)
+
+    def patch(self, request):
+        if self.transactional:
+            with transaction.atomic():
+                return self.process()
+
+        return self.process()
+
+
+class CustomBulkChangeView(CustomBulkUpdateView):
+    # Proxy class
+    pass
+
+
 class CustomDeleteView(CustomAPIView):
     renderer_classes = [JSONRenderer]
 
