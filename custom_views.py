@@ -772,7 +772,7 @@ class CustomBulkUpdateView(CustomAPIView):
 
             serializer = self.serializer_class(
                 instance=object_to_update,
-                data=self.request_data,
+                data=item,
                 partial=True,
                 context={
                     "request": self.request,
