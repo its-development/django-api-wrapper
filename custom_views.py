@@ -4,7 +4,7 @@ import logging
 import os
 import traceback
 
-from django.db import transaction, IntegrityError, NotSupportedError
+from django.db import transaction, IntegrityError, NotSupportedError, OperationalError
 from django.http import HttpResponse, FileResponse
 from django.db.models import Q, ProtectedError
 from rest_framework.parsers import MultiPartParser, FormParser
@@ -722,8 +722,16 @@ class CustomUpdateView(CustomAPIView):
 
     def patch(self, request):
         if self.transactional:
-            with transaction.atomic():
-                return self.process()
+            errors = 0
+            while errors < 3:
+                try:
+                    with transaction.atomic():
+                        return self.process()
+                except OperationalError:
+                    logger.error(traceback.format_exc())
+                    errors += 1
+
+            raise OperationalError("Too many errors")
 
         return self.process()
 
