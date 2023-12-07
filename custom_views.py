@@ -189,23 +189,11 @@ class CustomAPIView(APIView):
         return self.request_content.get("pagination")
 
     def filter_queryset(self, manager, fil=None):
-        if self.check_object_permission:
-            if hasattr(self.object_class, "q_check_obj_perm"):
-                objects = manager.filter(
-                    self.object_class.q_check_obj_perm(request=self.request)
-                )
-
-            else:
-                objects = manager
-
-        else:
-            objects = manager
-
         if fil:
             if isinstance(fil, dict):
-                objects = objects.filter(**fil)
+                objects = manager.filter(**fil)
             elif isinstance(fil, Q):
-                objects = objects.filter(fil)
+                objects = manager.filter(fil)
             else:
                 if ApiSettings.DEBUG:
                     print(type(fil))
@@ -214,7 +202,7 @@ class CustomAPIView(APIView):
             objects = objects
 
         else:
-            objects = objects.all()
+            objects = manager.all()
 
         if self.distinct_query:
             objects = objects.distinct()
@@ -265,8 +253,7 @@ class CustomListView(CustomAPIView):
         result_set = paginator.paginate(
             objects=objects,
             request=self.request,
-            check_object_permission=not hasattr(self.object_class, "q_check_obj_perm")
-            and self.check_object_permission,
+            check_object_permission=self.check_object_permission,
         )
 
         paginator.update_context(self.context)
@@ -735,15 +722,16 @@ class CustomUpdateView(CustomAPIView):
 
     def patch(self, request):
         if self.transactional:
-            with transaction.atomic():
-                return self.process()
-            # for _ in range(3):
-            #     try:
-            #         with transaction.atomic():
-            #             return self.process()
-            #     except OperationalError as e:
-            #         logger.error(e)
-            #         time.sleep(0.25)
+            errors = 0
+            while errors < 3:
+                try:
+                    with transaction.atomic():
+                        return self.process()
+                except OperationalError:
+                    logger.error(traceback.format_exc())
+                    errors += 1
+
+            raise OperationalError("Too many errors")
 
         return self.process()
 
