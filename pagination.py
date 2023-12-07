@@ -52,6 +52,10 @@ class ApiPaginator:
         request,
         check_object_permission: bool = True,
     ):
+        if not check_object_permission:
+            self.total = objects.count()
+            return objects[self.offset : self.offset + self.limit]
+
         result_set = self.setup(objects)
 
         if self.total == 0:
