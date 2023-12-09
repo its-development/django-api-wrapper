@@ -63,6 +63,8 @@ class ApiWrapperAbstractUser(AbstractUser):
         primary_key=True, default=uuid.uuid4, editable=False, unique=True
     )
 
+    full_name = models.CharField(max_length=255, default="N/A")
+
     email = models.EmailField(
         blank=True,
         unique=True,
@@ -71,3 +73,7 @@ class ApiWrapperAbstractUser(AbstractUser):
     class Meta:
         base_manager_name = "objects"
         abstract = True
+
+    def save(self, *args, **kwargs):
+        self.full_name = f"{self.first_name} {self.last_name}"
+        super().save(*args, **kwargs)
