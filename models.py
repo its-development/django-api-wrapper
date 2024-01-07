@@ -5,11 +5,6 @@ from django.db import models
 from .manager import ApiWrapperModelManager, ApiWrapperUserManager
 
 
-class Char32UUIDField(models.UUIDField):
-    def db_type(self, connection):
-        return "char(36)"
-
-
 class AnnotatedProperty(object):
     """
     Property for already annotated values, e.g. from a queryset. But it can also be used on instances.
@@ -33,7 +28,7 @@ class AnnotatedProperty(object):
 class ApiWrapperModel(models.Model):
     objects = ApiWrapperModelManager()
 
-    id = Char32UUIDField(
+    id = models.UUIDField(
         primary_key=True, default=uuid.uuid4, editable=False, unique=True
     )
     is_active = models.BooleanField(default=True)
@@ -64,7 +59,7 @@ class ApiWrapperModel(models.Model):
 
 class ApiWrapperAbstractUser(AbstractUser):
     objects = ApiWrapperUserManager()
-    id = Char32UUIDField(
+    id = models.UUIDField(
         primary_key=True, default=uuid.uuid4, editable=False, unique=True
     )
 
