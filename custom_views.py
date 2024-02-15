@@ -7,7 +7,7 @@ import traceback
 from django.db import transaction, IntegrityError, NotSupportedError, OperationalError
 from django.http import HttpResponse, FileResponse
 from django.db.models import Q, ProtectedError
-from rest_framework.parsers import MultiPartParser, FormParser
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 
 from rest_framework.renderers import JSONRenderer
 from rest_framework.views import APIView
@@ -640,7 +640,7 @@ class CustomUpdateView(CustomAPIView):
 
         try:
             object_to_update = self.object_class.objects.select_for_update().get(pk=pk)
-        except NotSupportedError:
+        except:
             object_to_update = self.object_class.objects.get(pk=pk)
 
         if not object_to_update:
@@ -1196,7 +1196,9 @@ class CustomFileUploadView(CustomAPIView):
         except NotSupportedError:
             model_instance = self.object_class.objects.get(pk=pk)
 
-        if not model_instance.check_change_perm(self.request):
+        if self.check_object_permission and not model_instance.check_change_perm(
+            self.request
+        ):
             raise ApiPermissionError("Object permission denied.")
 
         uploaded_file = self.request.FILES.get("uploaded_file")
