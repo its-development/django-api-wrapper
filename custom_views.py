@@ -743,6 +743,7 @@ class CustomChangeView(CustomUpdateView):
 
 class CustomBulkUpdateView(CustomAPIView):
     renderer_classes = [JSONRenderer]
+    continue_on_error = False
 
     def __init__(self, *args, **kwargs):
         self.context = ApiContext.update()
@@ -774,6 +775,9 @@ class CustomBulkUpdateView(CustomAPIView):
             if self.check_object_permission and not object_to_update.check_change_perm(
                 self.request
             ):
+                if self.continue_on_error:
+                    continue
+
                 raise ApiPermissionError("Object permission denied.")
 
             self.hook_before_update(object_to_update, item)
