@@ -6,7 +6,7 @@ from api.custom_views import CustomAPIView
 from api.daw_jwt.handler import create_jwt
 from api.exceptions import ApiAuthInvalid
 from api.helpers import ApiHelpers
-from api.cryptor import ApiCrypto
+from api.crypto import ApiCrypto
 
 
 class ObtainJWT(CustomAPIView):
