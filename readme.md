@@ -42,7 +42,7 @@ The encryption is also bytes-capable and allows file encryption.
 
 as simple as:
 ~~~python
-from api.cryptor import ApiCrypto
+from api.crypto import ApiCrypto
 
 plain_text = "django-api-wrapper"
 encrypted_text = ApiCrypto.encode(plain_text)

@@ -1,11 +1,13 @@
+import json
+import csv
 import logging
 import os
 import traceback
 
-import django
-from django.db import models, transaction
-from django.http import HttpResponse
-from django.db.models import Q
+from django.db import transaction, IntegrityError, NotSupportedError, OperationalError
+from django.http import HttpResponse, FileResponse
+from django.db.models import Q, ProtectedError
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 
 from rest_framework.renderers import JSONRenderer
 from rest_framework.views import APIView
@@ -17,9 +19,6 @@ from .helpers import ApiHelpers
 from .pagination import ApiPaginator
 from .context import ApiContext
 from .exceptions import *
-
-import csv
-
 from .throttles import BasicPasswordAuthThrottle, BasicTokenRefreshThrottle
 
 logger = logging.getLogger(os.environ.get("DJANGO_API_WRAPPER_LOGGER", "django"))
@@ -35,6 +34,7 @@ class CustomAPIView(APIView):
     enhanced_filters = False
     check_object_permission = True
     check_serializer_field_permission = True
+    encryption = False
     session_data = {}
 
     def __init__(self, *args, **kwargs):
@@ -49,7 +49,7 @@ class CustomAPIView(APIView):
     def respond(self, http_code=status.HTTP_200_OK):
         return Response(
             ApiHelpers.encrypt_context(self.context)
-            if self.request_content.get("encrypt") is True
+            if self.encryption
             else self.context,
             status=http_code,
         )
@@ -117,7 +117,6 @@ class CustomAPIView(APIView):
         :param request:
         :return request.data:
         """
-        content = {}
 
         if not self.request:
             raise ApiEmptyRequestError()
@@ -261,15 +260,17 @@ class CustomListView(CustomAPIView):
 
         self.hook_before_serializer(result_set)
 
-        result_set = self.return_serializer_class(
-            result_set,
-            many=True,
-            context={
-                "request": self.request,
-                "check_field_permission": self.check_serializer_field_permission,
-                "action": "view",
-            },
-        ).data
+        result_set = [
+            self.return_serializer_class(
+                instance=result,
+                context={
+                    "request": self.request,
+                    "check_field_permission": self.check_serializer_field_permission,
+                    "action": "view",
+                },
+            ).data
+            for result in result_set
+        ]
 
         self.context.update(
             {
@@ -637,7 +638,10 @@ class CustomUpdateView(CustomAPIView):
             else self.request_data.get("pk")
         )
 
-        object_to_update = self.object_class.objects.select_for_update().get(pk=pk)
+        try:
+            object_to_update = self.object_class.objects.select_for_update().get(pk=pk)
+        except:
+            object_to_update = self.object_class.objects.get(pk=pk)
 
         if not object_to_update:
             raise ApiObjectNotFound()
@@ -718,13 +722,146 @@ class CustomUpdateView(CustomAPIView):
 
     def patch(self, request):
         if self.transactional:
+            errors = 0
+            while errors < 3:
+                try:
+                    with transaction.atomic():
+                        return self.process()
+                except OperationalError:
+                    logger.error(traceback.format_exc())
+                    errors += 1
+
+            raise OperationalError("Too many errors")
+
+        return self.process()
+
+
+class CustomChangeView(CustomUpdateView):
+    # Proxy class
+    pass
+
+
+class CustomBulkUpdateView(CustomAPIView):
+    renderer_classes = [JSONRenderer]
+    continue_on_error = False
+
+    def __init__(self, *args, **kwargs):
+        self.context = ApiContext.update()
+        self.request_data = {}
+
+        super().__init__(*args, **kwargs)
+
+    def hook_before_update(self, obj, data):
+        pass
+
+    def hook_after_update(self, obj, data):
+        pass
+
+    def handler(self):
+        results = []
+        for item in self.request_data.get("items", []):
+            pk = item.get("id") if item.get("id") else item.get("pk")
+
+            try:
+                object_to_update = self.object_class.objects.select_for_update().get(
+                    pk=pk
+                )
+            except NotSupportedError:
+                object_to_update = self.object_class.objects.get(pk=pk)
+
+            if not object_to_update:
+                raise ApiObjectNotFound()
+
+            if self.check_object_permission and not object_to_update.check_change_perm(
+                self.request
+            ):
+                if self.continue_on_error:
+                    continue
+
+                raise ApiPermissionError("Object permission denied.")
+
+            self.hook_before_update(object_to_update, item)
+
+            serializer = self.serializer_class(
+                instance=object_to_update,
+                data=item,
+                partial=True,
+                context={
+                    "request": self.request,
+                    "check_field_permission": self.check_serializer_field_permission,
+                    "action": "change",
+                },
+            )
+
+            if not serializer.is_valid():
+                self.handle_invalid_serializer(serializer)
+
+            updated_object = serializer.save()
+
+            self.hook_after_update(updated_object, item)
+
+            results.append(
+                self.return_serializer_class(
+                    instance=updated_object,
+                    context={
+                        "request": self.request,
+                        "check_field_permission": self.check_serializer_field_permission,
+                        "action": "change",
+                    },
+                ).data
+            )
+
+        self.context.update(
+            {
+                "results": results,
+            }
+        )
+
+    def process(self):
+        if hasattr(self, "get_serializer_class"):
+            self.serializer_class = self.get_serializer_class()
+
+        self.get_rest_request_content()
+        self.get_request_content_data()
+        self.get_rest_content_flags()
+
+        try:
+            self.handler()
+        except Exception as e:
+            self.pre_handle_exception(e)
+
+        self.add_user_to_context()
+
+        if self.return_serializer_class:
+            self.context.update(
+                {
+                    "fields": self.return_serializer_class.get_accessible_fields(
+                        self.request, self.check_serializer_field_permission
+                    )
+                    if issubclass(
+                        self.return_serializer_class, ApiWrapperModelSerializer
+                    )
+                    else [*self.return_serializer_class.Meta.fields],
+                }
+            )
+
+        self.context.update(
+            {
+                "success": True,
+            }
+        )
+
+        return self.respond(status.HTTP_200_OK)
+
+    def patch(self, request):
+        if self.transactional:
             with transaction.atomic():
                 return self.process()
 
         return self.process()
 
 
-class CustomChangeView(CustomUpdateView):
+class CustomBulkChangeView(CustomBulkUpdateView):
     # Proxy class
     pass
 
@@ -799,9 +936,9 @@ class CustomDeleteView(CustomAPIView):
 
         try:
             self.handler()
-        except django.db.models.deletion.ProtectedError as e:
+        except ProtectedError as e:
             raise ApiDeleteProtectedError()
-        except django.db.utils.IntegrityError as e:
+        except IntegrityError as e:
             raise ApiDeleteIntegrityError()
         except Exception as e:
             self.pre_handle_exception(e)
@@ -1034,4 +1171,137 @@ class BasicTokenRefresh(CustomAPIView):
         return self.respond(status.HTTP_200_OK)
 
     def post(self, request):
+        return self.process()
+
+
+class CustomFileUploadView(CustomAPIView):
+    parser_classes = [MultiPartParser, FormParser]
+
+    def __init__(self, *args, **kwargs):
+        self.context = ApiContext.create()
+        self.request_data = {}
+        super().__init__(*args, **kwargs)
+
+    def hook_file_instance(self, obj, file):
+        pass
+
+    def handler(self):
+        if "id" not in self.request_data and "pk" not in self.request_data:
+            raise ApiContentDataPkNotProvided()
+
+        pk = (
+            self.request_data.get("id")
+            if self.request_data.get("id")
+            else self.request_data.get("pk")
+        )
+
+        try:
+            model_instance = self.object_class.objects.select_for_update().get(pk=pk)
+        except NotSupportedError:
+            model_instance = self.object_class.objects.get(pk=pk)
+
+        if self.check_object_permission and not model_instance.check_change_perm(
+            self.request
+        ):
+            raise ApiPermissionError("Object permission denied.")
+
+        uploaded_file = self.request.FILES.get("uploaded_file")
+
+        if not uploaded_file:
+            raise ApiContentDataFileNotProvided()
+
+        self.hook_file_instance(model_instance, uploaded_file)
+
+        model_instance.save()
+
+        self.context.update(
+            {
+                "success": True,
+                "result": self.return_serializer_class(
+                    instance=model_instance,
+                    context={
+                        "request": self.request,
+                        "check_field_permission": self.check_serializer_field_permission,
+                        "action": "view",
+                    },
+                ).data,
+            }
+        )
+
+    def process(self):
+        try:
+            self.get_rest_request_content()
+            self.get_request_content_data()
+
+            if isinstance(self.request_data, str):
+                self.request_data = json.loads(self.request_data)
+
+            self.request_data = {**self.request_data, **self.request.FILES}
+            self.get_rest_content_flags()
+            self.handler()
+        except Exception as e:
+            self.pre_handle_exception(e)
+
+        return self.respond(status.HTTP_201_CREATED)
+
+    def post(self, request):
+        if self.transactional:
+            with transaction.atomic():
+                return self.process()
+
+        return self.process()
+
+
+class CustomFileDownloadView(CustomAPIView):
+    def __init__(self, *args, **kwargs):
+        self.request_data = {}
+        super().__init__(*args, **kwargs)
+
+    def get_file(self, obj):
+        # This method can be overridden to perform some action on the file instance before downloading
+        raise NotImplementedError()
+
+    def handler(self):
+        if "id" not in self.request_data and "pk" not in self.request_data:
+            raise ApiContentDataPkNotProvided()
+
+        pk = (
+            self.request_data.get("id")
+            if self.request_data.get("id")
+            else self.request_data.get("pk")
+        )
+
+        try:
+            model_instance = self.object_class.objects.select_for_update().get(pk=pk)
+        except NotSupportedError:
+            model_instance = self.object_class.objects.get(pk=pk)
+
+        if not model_instance.check_change_perm(self.request):
+            raise ApiPermissionError("Object permission denied.")
+
+        file_instance = self.get_file(model_instance)
+
+        if not file_instance:
+            raise ApiContentDataFileNotProvided()
+
+        return FileResponse(
+            file_instance, as_attachment=True, filename=file_instance.name
+        )
+
+    def process(self):
+        try:
+            self.get_rest_request_content()
+            self.get_request_content_data()
+
+            return self.handler()
+
+        except Exception as e:
+            self.pre_handle_exception(e)
+            return self.respond(status.HTTP_400_BAD_REQUEST)
+
+    def post(self, request):
+        if self.transactional:
+            with transaction.atomic():
+                return self.process()
+
         return self.process()

@@ -6,13 +6,14 @@ import re
 from datetime import timedelta
 
 from django.contrib.auth.models import AnonymousUser
+from django.core.serializers.json import DjangoJSONEncoder
 from django.db.models import Q
 from django.db.models.functions import Lower, Upper
 from rest_framework import permissions
 from rest_framework import exceptions
 
 from api.exceptions import *
-from api.cryptor import ApiCrypto
+from api.crypto import ApiCrypto
 
 import ast
 import operator as op
@@ -160,7 +161,7 @@ class ApiHelpers:
                 ): binascii.hexlify(os.urandom(150)).decode()[0:150]
             }
         )
-        return {"data": ApiCrypto.encode(json.dumps(context, sort_keys=True, indent=1))}
+        return {"data": ApiCrypto.encode(context)}
 
     @staticmethod
     def round_float(value, precision) -> str:
