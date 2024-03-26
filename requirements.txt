@@ -1,0 +1,3 @@
+openpyxl
+pyjwt
+python-jose

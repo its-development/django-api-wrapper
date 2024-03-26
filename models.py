@@ -56,6 +56,9 @@ class ApiWrapperModel(models.Model):
     def check_delete_perm(self, request):
         return False
 
+    def check_export_perm(self, request):
+        return False
+
 
 class ApiWrapperAbstractUser(AbstractUser):
     objects = ApiWrapperUserManager()

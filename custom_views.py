@@ -3,6 +3,7 @@ import csv
 import logging
 import os
 import traceback
+from io import BytesIO
 
 from django.db import transaction, IntegrityError, NotSupportedError, OperationalError
 from django.http import HttpResponse, FileResponse
@@ -975,6 +976,9 @@ class CustomExportView(CustomAPIView):
         if not fields:
             fields = [field.name for field in self.object_class._meta.get_fields()]
 
+        # Handle joins
+        fields = [field.replace("__", ".") for field in fields]
+
         fields_translation = self.request_data.get("header")
 
         if not fields_translation:
@@ -1017,6 +1021,36 @@ class CustomExportView(CustomAPIView):
                     row_data[field] = ApiHelpers.rgetattr(row, field)
 
                 writer.writerow(row_data)
+
+        elif file_type == "xlsx":
+            from openpyxl import Workbook
+
+            wb = Workbook()
+            sheet = wb.active
+
+            sheet.append(fields_translation)
+
+            for obj in collection:
+                res = []
+                for field in fields:
+                    try:
+                        val = ApiHelpers.rgetattr(obj, field)
+                    except:
+                        val = ""
+                    res.append(str(val))
+
+                sheet.append(res)
+
+            buffer = BytesIO()
+            wb.save(buffer)
+            buffer.seek(0)
+
+            response = FileResponse(
+                buffer,
+                as_attachment=True,
+                filename="export.xlsx",
+                content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            )
 
         else:
             raise ApiError("No matching file_type.")
