@@ -960,11 +960,24 @@ class CustomDeleteView(CustomAPIView):
 
 class CustomExportView(CustomAPIView):
     renderer_classes = [JSONRenderer]
+    distinct_query = True
+
+    def get_queryset(self):
+        objects = self.filter_queryset(
+            self.annotate_queryset(self.object_class.objects),
+            self.request_filter,
+        )
+        objects = objects.order_by(
+            *ApiHelpers.eval_expr("(%s)" % (", ".join(self.request_order)))
+        )
+
+        return objects
 
     def post(self, request):
         self.get_rest_request_content()
         self.get_request_content_data()
         self.request_filter = self.get_rest_content_filter()
+        self.request_order = self.get_rest_content_order()
 
         file_type = self.request_data.get("file_type")
 
@@ -992,7 +1005,7 @@ class CustomExportView(CustomAPIView):
         for i, field in enumerate(fields):
             header.update({str(field): str(fields_translation[i])})
 
-        collection = self.object_class.objects.filter(**self.request_filter)
+        collection = self.get_queryset()
 
         for obj in collection:
             if not obj.check_export_perm(request):
