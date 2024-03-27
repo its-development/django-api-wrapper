@@ -1051,7 +1051,7 @@ class CustomExportView(CustomAPIView):
                 ).data
                 res = []
                 for field in fields:
-                    res.append(serialized_object.get(field, ""))
+                    res.append(str(serialized_object.get(field, "")))
 
                 sheet.append(res)
 
