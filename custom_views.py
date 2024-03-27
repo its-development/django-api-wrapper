@@ -989,9 +989,6 @@ class CustomExportView(CustomAPIView):
         if not fields:
             fields = [field.name for field in self.object_class._meta.get_fields()]
 
-        # Handle joins
-        fields = [field.replace("__", ".") for field in fields]
-
         fields_translation = self.request_data.get("header")
 
         if not fields_translation:
@@ -1044,13 +1041,17 @@ class CustomExportView(CustomAPIView):
             sheet.append(fields_translation)
 
             for obj in collection:
+                serialized_object = self.return_serializer_class(
+                    instance=obj,
+                    context={
+                        "request": self.request,
+                        "check_field_permission": self.check_serializer_field_permission,
+                        "action": "view",
+                    },
+                ).data
                 res = []
                 for field in fields:
-                    try:
-                        val = ApiHelpers.rgetattr(obj, field)
-                    except:
-                        val = ""
-                    res.append(str(val))
+                    res.append(serialized_object.get(field, ""))
 
                 sheet.append(res)
 
