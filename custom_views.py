@@ -266,6 +266,7 @@ class CustomListView(CustomAPIView):
                 instance=result,
                 context={
                     "request": self.request,
+                    "view": self,
                     "check_field_permission": self.check_serializer_field_permission,
                     "action": "view",
                 },
@@ -459,6 +460,7 @@ class CustomGetView(CustomAPIView):
                     instance=obj,
                     context={
                         "request": self.request,
+                        "view": self,
                         "check_field_permission": self.check_serializer_field_permission,
                         "action": "view",
                     },
@@ -531,6 +533,7 @@ class CustomCreateView(CustomAPIView):
             data=self.request_data,
             context={
                 "request": self.request,
+                "view": self,
                 "check_field_permission": self.check_serializer_field_permission,
                 "action": "add",
             },
@@ -555,6 +558,7 @@ class CustomCreateView(CustomAPIView):
                     instance=tmp_object,
                     context={
                         "request": self.request,
+                        "view": self,
                         "check_field_permission": self.check_serializer_field_permission,
                         "action": "view",
                     },
@@ -660,6 +664,7 @@ class CustomUpdateView(CustomAPIView):
             partial=True,
             context={
                 "request": self.request,
+                "view": self,
                 "check_field_permission": self.check_serializer_field_permission,
                 "action": "change",
             },
@@ -678,6 +683,7 @@ class CustomUpdateView(CustomAPIView):
                     instance=updated_object,
                     context={
                         "request": self.request,
+                        "view": self,
                         "check_field_permission": self.check_serializer_field_permission,
                         "action": "view",
                     },
@@ -789,6 +795,7 @@ class CustomBulkUpdateView(CustomAPIView):
                 partial=True,
                 context={
                     "request": self.request,
+                    "view": self,
                     "check_field_permission": self.check_serializer_field_permission,
                     "action": "change",
                 },
@@ -806,6 +813,7 @@ class CustomBulkUpdateView(CustomAPIView):
                     instance=updated_object,
                     context={
                         "request": self.request,
+                        "view": self,
                         "check_field_permission": self.check_serializer_field_permission,
                         "action": "change",
                     },
@@ -1045,6 +1053,7 @@ class CustomExportView(CustomAPIView):
                     instance=obj,
                     context={
                         "request": self.request,
+                        "view": self,
                         "check_field_permission": self.check_serializer_field_permission,
                         "action": "view",
                     },
@@ -1125,6 +1134,7 @@ class BasicPasswordAuth(CustomAPIView):
                         instance=user,
                         context={
                             "request": self.request,
+                            "view": self,
                             "check_field_permission": self.check_serializer_field_permission,
                             "action": "view",
                         },
@@ -1133,6 +1143,7 @@ class BasicPasswordAuth(CustomAPIView):
                         instance=token,
                         context={
                             "request": self.request,
+                            "view": self,
                             "check_field_permission": self.check_serializer_field_permission,
                             "action": "view",
                         },
@@ -1194,6 +1205,7 @@ class BasicTokenRefresh(CustomAPIView):
                         instance=token,
                         context={
                             "request": self.request,
+                            "view": self,
                             "check_field_permission": self.check_serializer_field_permission,
                             "action": "view",
                         },
@@ -1269,6 +1281,7 @@ class CustomFileUploadView(CustomAPIView):
                     instance=model_instance,
                     context={
                         "request": self.request,
+                        "view": self,
                         "check_field_permission": self.check_serializer_field_permission,
                         "action": "view",
                     },
