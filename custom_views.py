@@ -946,9 +946,9 @@ class CustomDeleteView(CustomAPIView):
         try:
             self.handler()
         except ProtectedError as e:
-            raise ApiDeleteProtectedError()
+            raise ApiDeleteProtectedError(e)
         except IntegrityError as e:
-            raise ApiDeleteIntegrityError()
+            raise ApiDeleteIntegrityError(e)
         except Exception as e:
             self.pre_handle_exception(e)
 
