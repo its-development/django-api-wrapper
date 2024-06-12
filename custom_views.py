@@ -620,6 +620,7 @@ class CustomAddView(CustomCreateView):
 
 class CustomUpdateView(CustomAPIView):
     renderer_classes = [JSONRenderer]
+    select_for_update = True
 
     def __init__(self, *args, **kwargs):
         self.context = ApiContext.update()
@@ -644,7 +645,12 @@ class CustomUpdateView(CustomAPIView):
         )
 
         try:
-            object_to_update = self.object_class.objects.select_for_update().get(pk=pk)
+            if self.select_for_update:
+                object_to_update = self.object_class.objects.select_for_update().get(
+                    pk=pk
+                )
+            else:
+                object_to_update = self.object_class.objects.get(pk=pk)
         except:
             object_to_update = self.object_class.objects.get(pk=pk)
 
