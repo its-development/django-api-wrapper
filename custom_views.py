@@ -1251,7 +1251,7 @@ class CustomFileUploadView(CustomAPIView):
     def hook_file_instance(self, obj, file):
         pass
 
-    def handler(self):
+    def get_queryset(self):
         if "id" not in self.request_data and "pk" not in self.request_data:
             raise ApiContentDataPkNotProvided()
 
@@ -1265,6 +1265,11 @@ class CustomFileUploadView(CustomAPIView):
             model_instance = self.object_class.objects.select_for_update().get(pk=pk)
         except NotSupportedError:
             model_instance = self.object_class.objects.get(pk=pk)
+
+        return model_instance
+
+    def handler(self):
+        model_instance = self.get_queryset()
 
         if self.check_object_permission and not model_instance.check_change_perm(
             self.request
