@@ -1251,6 +1251,9 @@ class CustomFileUploadView(CustomAPIView):
     def hook_file_instance(self, obj, file):
         pass
 
+    def hook_after_save(self, obj):
+        pass
+
     def get_queryset(self):
         if "id" not in self.request_data and "pk" not in self.request_data:
             raise ApiContentDataPkNotProvided()
@@ -1284,6 +1287,8 @@ class CustomFileUploadView(CustomAPIView):
         self.hook_file_instance(model_instance, uploaded_file)
 
         model_instance.save()
+
+        self.hook_after_save(model_instance)
 
         self.context.update(
             {
