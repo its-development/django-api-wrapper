@@ -1242,6 +1242,7 @@ class BasicTokenRefresh(CustomAPIView):
 
 class CustomFileUploadView(CustomAPIView):
     parser_classes = [MultiPartParser, FormParser]
+    require_file = True
 
     def __init__(self, *args, **kwargs):
         self.context = ApiContext.create()
@@ -1281,12 +1282,30 @@ class CustomFileUploadView(CustomAPIView):
 
         uploaded_file = self.request.FILES.get("uploaded_file")
 
-        if not uploaded_file:
+        if not uploaded_file and self.require_file:
             raise ApiContentDataFileNotProvided()
 
         self.hook_file_instance(model_instance, uploaded_file)
 
-        model_instance.save()
+        if self.serializer_class:
+            serializer = self.serializer_class(
+                instance=model_instance,
+                data=self.request_data,
+                context={
+                    "request": self.request,
+                    "view": self,
+                    "check_field_permission": self.check_serializer_field_permission,
+                    "action": "change",
+                },
+            )
+
+            if not serializer.is_valid():
+                self.handle_invalid_serializer(serializer)
+
+            model_instance = serializer.save()
+
+        else:
+            model_instance.save()
 
         self.hook_after_save(model_instance)
 
