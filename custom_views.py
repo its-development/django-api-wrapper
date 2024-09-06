@@ -1243,6 +1243,8 @@ class BasicTokenRefresh(CustomAPIView):
 class CustomFileUploadView(CustomAPIView):
     parser_classes = [MultiPartParser, FormParser]
     require_file = True
+    multiple_files = False
+    request_file_name = "uploaded_file"
 
     def __init__(self, *args, **kwargs):
         self.context = ApiContext.create()
@@ -1280,7 +1282,10 @@ class CustomFileUploadView(CustomAPIView):
         ):
             raise ApiPermissionError("Object permission denied.")
 
-        uploaded_file = self.request.FILES.get("uploaded_file")
+        if self.multiple_files:
+            uploaded_file = self.request.FILES.getlist(self.request_file_name)
+        else:
+            uploaded_file = self.request.FILES.get(self.request_file_name)
 
         if not uploaded_file and self.require_file:
             raise ApiContentDataFileNotProvided()
