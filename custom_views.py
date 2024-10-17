@@ -49,9 +49,11 @@ class CustomAPIView(APIView):
 
     def respond(self, http_code=status.HTTP_200_OK):
         return Response(
-            ApiHelpers.encrypt_context(self.context)
-            if self.encryption
-            else self.context,
+            (
+                ApiHelpers.encrypt_context(self.context)
+                if self.encryption
+                else self.context
+            ),
             status=http_code,
         )
 
@@ -297,13 +299,15 @@ class CustomListView(CustomAPIView):
         if self.return_serializer_class:
             self.context.update(
                 {
-                    "columns": self.return_serializer_class.get_accessible_fields(
-                        self.request, self.check_serializer_field_permission
-                    )
-                    if issubclass(
-                        self.return_serializer_class, ApiWrapperModelSerializer
-                    )
-                    else [*self.return_serializer_class.Meta.fields],
+                    "columns": (
+                        self.return_serializer_class.get_accessible_fields(
+                            self.request, self.check_serializer_field_permission
+                        )
+                        if issubclass(
+                            self.return_serializer_class, ApiWrapperModelSerializer
+                        )
+                        else [*self.return_serializer_class.Meta.fields]
+                    ),
                 }
             )
 
@@ -487,13 +491,15 @@ class CustomGetView(CustomAPIView):
         if self.return_serializer_class:
             self.context.update(
                 {
-                    "fields": self.return_serializer_class.get_accessible_fields(
-                        self.request, self.check_serializer_field_permission
-                    )
-                    if issubclass(
-                        self.return_serializer_class, ApiWrapperModelSerializer
-                    )
-                    else [*self.return_serializer_class.Meta.fields],
+                    "fields": (
+                        self.return_serializer_class.get_accessible_fields(
+                            self.request, self.check_serializer_field_permission
+                        )
+                        if issubclass(
+                            self.return_serializer_class, ApiWrapperModelSerializer
+                        )
+                        else [*self.return_serializer_class.Meta.fields]
+                    ),
                 }
             )
 
@@ -584,13 +590,15 @@ class CustomCreateView(CustomAPIView):
         if self.return_serializer_class:
             self.context.update(
                 {
-                    "fields": self.return_serializer_class.get_accessible_fields(
-                        self.request, self.check_serializer_field_permission
-                    )
-                    if issubclass(
-                        self.return_serializer_class, ApiWrapperModelSerializer
-                    )
-                    else [*self.return_serializer_class.Meta.fields],
+                    "fields": (
+                        self.return_serializer_class.get_accessible_fields(
+                            self.request, self.check_serializer_field_permission
+                        )
+                        if issubclass(
+                            self.return_serializer_class, ApiWrapperModelSerializer
+                        )
+                        else [*self.return_serializer_class.Meta.fields]
+                    ),
                 }
             )
 
@@ -634,7 +642,7 @@ class CustomUpdateView(CustomAPIView):
     def hook_after_update(self, obj):
         pass
 
-    def handler(self):
+    def get_queryset(self):
         if "id" not in self.request_data and "pk" not in self.request_data:
             raise ApiContentDataPkNotProvided()
 
@@ -653,6 +661,11 @@ class CustomUpdateView(CustomAPIView):
                 object_to_update = self.object_class.objects.get(pk=pk)
         except:
             object_to_update = self.object_class.objects.get(pk=pk)
+
+        return object_to_update
+
+    def handler(self):
+        object_to_update = self.get_queryset()
 
         if not object_to_update:
             raise ApiObjectNotFound()
@@ -715,13 +728,15 @@ class CustomUpdateView(CustomAPIView):
         if self.return_serializer_class:
             self.context.update(
                 {
-                    "fields": self.return_serializer_class.get_accessible_fields(
-                        self.request, self.check_serializer_field_permission
-                    )
-                    if issubclass(
-                        self.return_serializer_class, ApiWrapperModelSerializer
-                    )
-                    else [*self.return_serializer_class.Meta.fields],
+                    "fields": (
+                        self.return_serializer_class.get_accessible_fields(
+                            self.request, self.check_serializer_field_permission
+                        )
+                        if issubclass(
+                            self.return_serializer_class, ApiWrapperModelSerializer
+                        )
+                        else [*self.return_serializer_class.Meta.fields]
+                    ),
                 }
             )
 
@@ -850,13 +865,15 @@ class CustomBulkUpdateView(CustomAPIView):
         if self.return_serializer_class:
             self.context.update(
                 {
-                    "fields": self.return_serializer_class.get_accessible_fields(
-                        self.request, self.check_serializer_field_permission
-                    )
-                    if issubclass(
-                        self.return_serializer_class, ApiWrapperModelSerializer
-                    )
-                    else [*self.return_serializer_class.Meta.fields],
+                    "fields": (
+                        self.return_serializer_class.get_accessible_fields(
+                            self.request, self.check_serializer_field_permission
+                        )
+                        if issubclass(
+                            self.return_serializer_class, ApiWrapperModelSerializer
+                        )
+                        else [*self.return_serializer_class.Meta.fields]
+                    ),
                 }
             )
 
