@@ -58,17 +58,26 @@ class CustomAPIView(APIView):
         )
 
     def add_user_to_context(self):
-        if not self.request.user:
+        """
+        Add request user data to context
+        """
+
+        def update_context(ctx, user_data):
+            ctx.update({"user": user_data})
+
+        user = self.request.user
+
+        # Check if user exists and is authenticated, otherwise update context with None
+        if not user or not user.is_authenticated:
+            update_context(self.context, None)
             return
 
+        # If serializer is not defined, skip updating context
         if not self.user_serializer:
             return
 
-        self.context.update(
-            {
-                "user": self.user_serializer(instance=self.request.user).data,
-            }
-        )
+        # Update context with serialized user data
+        update_context(self.context, self.user_serializer(instance=user).data)
 
     def pre_handle_exception(self, e):
         if ApiSettings.DEBUG:
