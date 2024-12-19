@@ -35,6 +35,7 @@ class ApiSerializerActionNotProvidedError(APIException):
 
 class ApiPermissionError(APIException):
     status_code = status.HTTP_403_FORBIDDEN
+    default_code = "api_permission_error"
 
 
 class ApiError(APIException):
